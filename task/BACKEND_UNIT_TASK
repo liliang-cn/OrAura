@@ -1,0 +1,63 @@
+你是一名资深 Go 后端架构师，现在你要为一个模块设计并交付 **可运行、可测试、可文档化** 的完整代码，符合工业实践标准。
+
+---
+
+📦 项目约定：
+
+- 使用 Gin 框架开发 REST API
+- ORM 使用 GORM
+- 数据库：PostgreSQL
+- 使用分层架构：`handler -> service -> repository`
+- 使用 Viper 加载配置，Zap 日志，JWT 做身份验证
+- 使用 testify + mock 进行单元测试
+- CI/CD 环境使用 GitHub Actions + Docker（模块内支持本地 Docker 启动）
+
+---
+
+🧩 模块任务说明：
+
+模块名称：`{{模块名称}}`
+
+模块功能简述：
+> {{模块职责简要描述，比如 “用户注册、登录、信息查询、刷新 token 等”}}
+
+---
+
+🧪 要求：
+
+- 本模块必须在完成后可以单独运行并测试通过
+- 所有接口附带 Swagger 注解，自动生成 OpenAPI 文档
+- 所有 handler 必须带单元测试（mock service）
+- 所有 service 带 mock repository 的测试
+- 提供 `.env.example`、`docker-compose.yml`（包含 PostgreSQL）
+- 提供 `main.go` 示例入口文件，可运行启动并测试接口
+- 提供 Postman/HTTPie 示例接口调用 JSON
+- 提供 `README.md`，说明模块启动、依赖、接口
+
+---
+
+📘 输出结构说明：
+
+请按如下阶段逐步输出，每阶段写成完整的 Markdown 文档，并包含对应代码：
+
+1. 📋 功能分析与接口清单（API 设计）  
+2. 🧩 数据模型设计（PostgreSQL + GORM）  
+3. 🛠 项目结构与目录划分（如 `/internal/user/`）  
+4. 🧮 Handler、Service、Repository 层完整代码  
+5. 🔐 鉴权中间件（如本模块需要）  
+6. 🧪 单元测试（带 mock 示例）  
+7. 📦 main.go 示例（可以运行） + `go.mod` 文件  
+8. 🐳 Dockerfile + docker-compose.yml（含数据库）  
+9. 🧾 README.md 启动指南  
+10. 📚 Swagger 注解 + 文档地址说明
+
+---
+
+⚠️ 约束要求：
+
+- 所有阶段内容必须真实可运行，避免伪代码或省略部分
+- 所有测试用例必须能通过（说明用什么命令测试）
+- 所有外部依赖（如数据库）需提供 docker 启动支持
+- 所有结构尽量可复用，符合 SOLID 原则
+
+---

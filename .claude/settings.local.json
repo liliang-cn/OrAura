@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod:*)",
+      "Bash(go build:*)",
+      "Bash(rm:*)",
+      "Bash(go test:*)",
+      "Bash(cp:*)",
+      "Bash(make:*)",
+      "Bash(docker compose:*)",
+      "Bash(timeout:*)",
+      "Bash(chmod:*)",
+      "Bash(./verify.sh:*)"
+    ],
+    "deny": []
+  }
+}

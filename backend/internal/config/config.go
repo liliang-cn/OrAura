@@ -10,14 +10,14 @@ import (
 
 // Config 应用配置结构
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	OAuth     OAuthConfig     `mapstructure:"oauth"`
-	OpenAI    OpenAIConfig    `mapstructure:"openai"`
-	Storage   StorageConfig   `mapstructure:"storage"`
-	Logging   LoggingConfig   `mapstructure:"logging"`
+	Server     ServerConfig     `mapstructure:"server"`
+	Database   DatabaseConfig   `mapstructure:"database"`
+	Redis      RedisConfig      `mapstructure:"redis"`
+	JWT        JWTConfig        `mapstructure:"jwt"`
+	OAuth      OAuthConfig      `mapstructure:"oauth"`
+	OpenAI     OpenAIConfig     `mapstructure:"openai"`
+	Storage    StorageConfig    `mapstructure:"storage"`
+	Logging    LoggingConfig    `mapstructure:"logging"`
 	SuperAdmin SuperAdminConfig `mapstructure:"super_admin"`
 }
 
@@ -51,9 +51,9 @@ type RedisConfig struct {
 }
 
 type JWTConfig struct {
-	Secret              string        `mapstructure:"secret"`
-	AccessTokenExpire   time.Duration `mapstructure:"access_token_expire"`
-	RefreshTokenExpire  time.Duration `mapstructure:"refresh_token_expire"`
+	Secret             string        `mapstructure:"secret"`
+	AccessTokenExpire  time.Duration `mapstructure:"access_token_expire"`
+	RefreshTokenExpire time.Duration `mapstructure:"refresh_token_expire"`
 }
 
 type OAuthConfig struct {
@@ -102,30 +102,30 @@ type SuperAdminConfig struct {
 // LoadConfig 加载配置
 func LoadConfig(path string) (*Config, error) {
 	viper.SetConfigName("app")
-	viper.SetConfigType("env")
+	viper.SetConfigType("yaml")
 	viper.AddConfigPath(path)
 	viper.AddConfigPath(".")
-	
+
 	// 环境变量支持
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("ORAURA")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	
+
 	// 设置默认值
 	setDefaults()
-	
+
 	if err := viper.ReadInConfig(); err != nil {
 		// 如果配置文件不存在，使用默认值和环境变量
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
-	
+
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -137,7 +137,7 @@ func setDefaults() {
 	viper.SetDefault("server.mode", "debug")
 	viper.SetDefault("server.read_timeout", "60s")
 	viper.SetDefault("server.write_timeout", "60s")
-	
+
 	// 数据库默认配置
 	viper.SetDefault("database.driver", "postgres")
 	viper.SetDefault("database.host", "localhost")
@@ -149,44 +149,44 @@ func setDefaults() {
 	viper.SetDefault("database.max_open_conns", 25)
 	viper.SetDefault("database.max_idle_conns", 10)
 	viper.SetDefault("database.conn_max_lifetime", "5m")
-	
+
 	// Redis 默认配置
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.database", 0)
 	viper.SetDefault("redis.pool_size", 10)
-	
+
 	// JWT 默认配置
 	viper.SetDefault("jwt.secret", "your-super-secret-key")
 	viper.SetDefault("jwt.access_token_expire", "1h")
 	viper.SetDefault("jwt.refresh_token_expire", "720h")
-	
+
 	// OAuth 默认配置
 	viper.SetDefault("oauth.google.client_id", "")
 	viper.SetDefault("oauth.google.client_secret", "")
 	viper.SetDefault("oauth.apple.client_id", "")
 	viper.SetDefault("oauth.apple.client_secret", "")
-	
+
 	// OpenAI 默认配置
 	viper.SetDefault("openai.api_key", "")
 	viper.SetDefault("openai.model", "gpt-4o")
 	viper.SetDefault("openai.max_tokens", 1000)
 	viper.SetDefault("openai.temperature", 0.7)
-	
+
 	// 存储默认配置
 	viper.SetDefault("storage.provider", "local")
 	viper.SetDefault("storage.bucket", "oraura-media")
 	viper.SetDefault("storage.region", "us-west-2")
 	viper.SetDefault("storage.access_key", "")
 	viper.SetDefault("storage.secret_key", "")
-	
+
 	// 日志默认配置
 	viper.SetDefault("logging.level", "info")
 	viper.SetDefault("logging.format", "json")
 	viper.SetDefault("logging.output", "stdout")
 	viper.SetDefault("logging.file_path", "logs/app.log")
-	
+
 	// 超级管理员默认配置
 	viper.SetDefault("super_admin.email", "admin@oraura.app")
 	viper.SetDefault("super_admin.username", "superadmin")
@@ -201,7 +201,7 @@ func (c *Config) GetServerAddress() string {
 // GetDatabaseDSN 获取数据库连接字符串
 func (c *Config) GetDatabaseDSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Database.Host, c.Database.Port, c.Database.User, 
+		c.Database.Host, c.Database.Port, c.Database.User,
 		c.Database.Password, c.Database.Name, c.Database.SSLMode)
 }
 

@@ -185,7 +185,7 @@ ORAURA_OAUTH_GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 4. **Configure Environment**
    ```bash
-   cp configs/app.env.example configs/app.env
+   cp configs/app.example.yaml configs/app.env
    # Edit configs/app.env with your settings
    ```
 

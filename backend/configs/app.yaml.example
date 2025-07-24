@@ -1,0 +1,32 @@
+# Database Configuration
+database:
+  host: localhost
+  user: postgres
+  password: secret
+  name: oraura
+  port: 5432
+
+# Server Configuration
+server:
+  address: "0.0.0.0:8080"
+
+# JWT Configuration
+jwt:
+  secret: "your-super-secret-jwt-key-change-this-in-production"
+  access_token_expire: "1h"
+  refresh_token_expire: "720h"
+
+# Super Admin Configuration
+super_admin:
+  email: "admin@oraura.app"
+  username: "superadmin"
+  password: "SuperAdmin123!"
+
+# OAuth Configuration (optional)
+oauth:
+  google:
+    client_id: ""
+    client_secret: ""
+  apple:
+    client_id: ""
+    client_secret: ""

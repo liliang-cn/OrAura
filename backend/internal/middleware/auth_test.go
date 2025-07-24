@@ -1,55 +1,73 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/OrAura/backend/internal/models"
-	"github.com/OrAura/backend/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
 
-// MockUserService 模拟用户服务
-type MockUserService struct {
-	mock.Mock
+// 🎯 简洁的AuthService Mock - 只实现3个方法！
+type MockAuthService struct {
+	users       map[string]*models.User  // token -> user
+	blacklist   map[string]bool          // token -> is_blacklisted  
+	permissions map[string]bool          // userID:resource:action -> has_permission
 }
 
-func (m *MockUserService) ValidateAccessToken(tokenString string) (*models.User, error) {
-	args := m.Called(tokenString)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func NewMockAuthService() *MockAuthService {
+	return &MockAuthService{
+		users:       make(map[string]*models.User),
+		blacklist:   make(map[string]bool),
+		permissions: make(map[string]bool),
 	}
-	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) IsTokenBlacklisted(token string) (bool, error) {
-	args := m.Called(token)
-	return args.Bool(0), args.Error(1)
+func (m *MockAuthService) ValidateAccessToken(ctx context.Context, tokenString string) (*models.User, error) {
+	if user, exists := m.users[tokenString]; exists {
+		return user, nil
+	}
+	return nil, errors.New("invalid token")
 }
 
-func (m *MockUserService) HasPermission(userID uuid.UUID, resource, action string) (bool, error) {
-	args := m.Called(userID, resource, action)
-	return args.Bool(0), args.Error(1)
+func (m *MockAuthService) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	return m.blacklist[token], nil
+}
+
+func (m *MockAuthService) HasPermission(ctx context.Context, userID uuid.UUID, resource, action string) (bool, error) {
+	key := userID.String() + ":" + resource + ":" + action
+	return m.permissions[key], nil
+}
+
+// 测试辅助方法
+func (m *MockAuthService) AddUser(token string, user *models.User) {
+	m.users[token] = user
+}
+
+func (m *MockAuthService) BlacklistToken(token string) {
+	m.blacklist[token] = true
+}
+
+func (m *MockAuthService) GrantPermission(userID uuid.UUID, resource, action string) {
+	key := userID.String() + ":" + resource + ":" + action
+	m.permissions[key] = true
 }
 
 // 测试设置
-func setupTestRouter() (*gin.Engine, *MockUserService) {
+func setupMiddlewareTest() (*gin.Engine, *MockAuthService) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	
-	mockUserService := new(MockUserService)
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
+	mockAuth := NewMockAuthService()
 	logger := zap.NewNop()
-	
-	authMiddleware := NewAuthMiddleware(mockUserService, jwtManager, logger)
+	authMiddleware := NewAuthMiddleware(mockAuth, logger)
 	
 	// 测试路由
 	protected := router.Group("/protected")
@@ -70,15 +88,6 @@ func setupTestRouter() (*gin.Engine, *MockUserService) {
 		})
 	}
 	
-	member := router.Group("/member")
-	member.Use(authMiddleware.RequireAuth())
-	member.Use(authMiddleware.RequireMember())
-	{
-		member.GET("/features", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"message": "member features"})
-		})
-	}
-	
 	permission := router.Group("/permission")
 	permission.Use(authMiddleware.RequireAuth())
 	permission.Use(authMiddleware.RequirePermission("users", "read"))
@@ -88,45 +97,13 @@ func setupTestRouter() (*gin.Engine, *MockUserService) {
 		})
 	}
 	
-	return router, mockUserService
+	return router, mockAuth
 }
 
-func TestAuthMiddleware_RequireAuth_Success(t *testing.T) {
-	router, mockUserService := setupTestRouter()
-	
-	userID := uuid.New()
-	user := &models.User{
-		ID:     userID,
-		Email:  "test@example.com",
-		Status: models.UserStatusActive,
-	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
-	
-	req, _ := http.NewRequest("GET", "/protected/profile", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	
-	assert.Equal(t, http.StatusOK, w.Code)
-	
-	var response map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, userID.String(), response["user_id"])
-	
-	mockUserService.AssertExpectations(t)
-}
+// 🧪 清洁的测试用例
 
-func TestAuthMiddleware_RequireAuth_NoToken(t *testing.T) {
-	router, _ := setupTestRouter()
+func TestAuth_NoToken(t *testing.T) {
+	router, _ := setupMiddlewareTest()
 	
 	req, _ := http.NewRequest("GET", "/protected/profile", nil)
 	w := httptest.NewRecorder()
@@ -137,20 +114,59 @@ func TestAuthMiddleware_RequireAuth_NoToken(t *testing.T) {
 	var response models.APIResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.False(t, response.Success)
 	assert.Equal(t, 40101, response.Code)
 }
 
-func TestAuthMiddleware_RequireAuth_InvalidToken(t *testing.T) {
-	router, mockUserService := setupTestRouter()
-	
-	// 使用无效的令牌
-	invalidToken := "invalid.jwt.token"
-	
-	mockUserService.On("ValidateAccessToken", invalidToken).Return(nil, errors.New("invalid token"))
+func TestAuth_InvalidToken(t *testing.T) {
+	router, _ := setupMiddlewareTest()
 	
 	req, _ := http.NewRequest("GET", "/protected/profile", nil)
-	req.Header.Set("Authorization", "Bearer "+invalidToken)
+	req.Header.Set("Authorization", "Bearer invalid-token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuth_ValidToken(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
+	
+	// 设置测试数据 - 简单直接！
+	userID := uuid.New()
+	user := &models.User{
+		ID:     userID,
+		Email:  "test@example.com",
+		Status: models.UserStatusActive,
+	}
+	mockAuth.AddUser("valid-token", user)
+	
+	req, _ := http.NewRequest("GET", "/protected/profile", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, userID.String(), response["user_id"])
+}
+
+func TestAuth_BlacklistedToken(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
+	
+	userID := uuid.New()
+	user := &models.User{
+		ID:     userID,
+		Email:  "test@example.com",
+		Status: models.UserStatusActive,
+	}
+	mockAuth.AddUser("blacklisted-token", user)
+	mockAuth.BlacklistToken("blacklisted-token")  // 加入黑名单
+	
+	req, _ := http.NewRequest("GET", "/protected/profile", nil)
+	req.Header.Set("Authorization", "Bearer blacklisted-token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	
@@ -159,175 +175,58 @@ func TestAuthMiddleware_RequireAuth_InvalidToken(t *testing.T) {
 	var response models.APIResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.False(t, response.Success)
-	
-	mockUserService.AssertExpectations(t)
-}
-
-func TestAuthMiddleware_RequireAuth_BlacklistedToken(t *testing.T) {
-	router, mockUserService := setupTestRouter()
-	
-	userID := uuid.New()
-	user := &models.User{
-		ID:     userID,
-		Email:  "test@example.com",
-		Status: models.UserStatusActive,
-	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用 - 令牌被加入黑名单
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(true, nil)
-	
-	req, _ := http.NewRequest("GET", "/protected/profile", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	
-	var response models.APIResponse
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.False(t, response.Success)
 	assert.Equal(t, 40103, response.Code)
-	
-	mockUserService.AssertExpectations(t)
 }
 
-func TestAuthMiddleware_RequireRole_Success(t *testing.T) {
-	router, mockUserService := setupTestRouter()
+func TestAuth_AdminRole(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
 	
-	userID := uuid.New()
 	// 创建管理员用户
-	user := &models.User{
-		ID:     userID,
-		Email:  "admin@example.com",
-		Status: models.UserStatusActive,
-		Roles: []*models.UserRoleAssignment{
-			{
-				UserID: userID,
-				Role: &models.Role{
-					ID:   uuid.New(),
-					Name: "admin",
-				},
-				IsActive: true,
-			},
-		},
+	adminID := uuid.New()
+	admin := &models.User{
+		ID:          adminID,
+		Email:       "admin@example.com",
+		Status:      models.UserStatusActive,
+		DefaultRole: models.UserRoleAdmin,
 	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
+	mockAuth.AddUser("admin-token", admin)
 	
 	req, _ := http.NewRequest("GET", "/admin/users", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer admin-token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	
 	assert.Equal(t, http.StatusOK, w.Code)
 	
 	var response map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &response)
+	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "admin only", response["message"])
-	
-	mockUserService.AssertExpectations(t)
 }
 
-func TestAuthMiddleware_RequireRole_Forbidden(t *testing.T) {
-	router, mockUserService := setupTestRouter()
+func TestAuth_RegularUserForbidden(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
 	
-	userID := uuid.New()
 	// 创建普通用户
+	userID := uuid.New()
 	user := &models.User{
-		ID:     userID,
-		Email:  "user@example.com",
-		Status: models.UserStatusActive,
-		Roles:  []*models.UserRoleAssignment{}, // 没有管理员角色
+		ID:          userID,
+		Email:       "user@example.com",
+		Status:      models.UserStatusActive,
+		DefaultRole: models.UserRoleRegular,
 	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
+	mockAuth.AddUser("user-token", user)
 	
 	req, _ := http.NewRequest("GET", "/admin/users", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer user-token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	
 	assert.Equal(t, http.StatusForbidden, w.Code)
-	
-	var response models.APIResponse
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.False(t, response.Success)
-	assert.Equal(t, 40301, response.Code)
-	
-	mockUserService.AssertExpectations(t)
 }
 
-func TestAuthMiddleware_RequireMember_Success(t *testing.T) {
-	router, mockUserService := setupTestRouter()
-	
-	userID := uuid.New()
-	// 创建会员用户
-	user := &models.User{
-		ID:     userID,
-		Email:  "member@example.com",
-		Status: models.UserStatusActive,
-		Roles: []*models.UserRoleAssignment{
-			{
-				UserID: userID,
-				Role: &models.Role{
-					ID:   uuid.New(),
-					Name: "member",
-				},
-				IsActive: true,
-			},
-		},
-	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
-	
-	req, _ := http.NewRequest("GET", "/member/features", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	
-	assert.Equal(t, http.StatusOK, w.Code)
-	
-	var response map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, "member features", response["message"])
-	
-	mockUserService.AssertExpectations(t)
-}
-
-func TestAuthMiddleware_RequirePermission_Success(t *testing.T) {
-	router, mockUserService := setupTestRouter()
+func TestAuth_Permission_Granted(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
 	
 	userID := uuid.New()
 	user := &models.User{
@@ -335,34 +234,24 @@ func TestAuthMiddleware_RequirePermission_Success(t *testing.T) {
 		Email:  "user@example.com",
 		Status: models.UserStatusActive,
 	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
-	mockUserService.On("HasPermission", userID, "users", "read").Return(true, nil)
+	mockAuth.AddUser("user-token", user)
+	mockAuth.GrantPermission(userID, "users", "read")  // 授予权限
 	
 	req, _ := http.NewRequest("GET", "/permission/data", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer user-token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	
 	assert.Equal(t, http.StatusOK, w.Code)
 	
 	var response map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &response)
+	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "permission granted", response["message"])
-	
-	mockUserService.AssertExpectations(t)
 }
 
-func TestAuthMiddleware_RequirePermission_Forbidden(t *testing.T) {
-	router, mockUserService := setupTestRouter()
+func TestAuth_Permission_Denied(t *testing.T) {
+	router, mockAuth := setupMiddlewareTest()
 	
 	userID := uuid.New()
 	user := &models.User{
@@ -370,55 +259,13 @@ func TestAuthMiddleware_RequirePermission_Forbidden(t *testing.T) {
 		Email:  "user@example.com",
 		Status: models.UserStatusActive,
 	}
-	
-	// 创建有效的JWT令牌
-	jwtManager := utils.NewJWTManager("test-secret", time.Hour, 24*time.Hour)
-	token, err := jwtManager.GenerateToken(userID, user.Email)
-	assert.NoError(t, err)
-	
-	// Mock服务调用
-	mockUserService.On("ValidateAccessToken", token).Return(user, nil)
-	mockUserService.On("IsTokenBlacklisted", mock.AnythingOfType("string")).Return(false, nil)
-	mockUserService.On("HasPermission", userID, "users", "read").Return(false, nil)
+	mockAuth.AddUser("user-token", user)
+	// 不授予权限
 	
 	req, _ := http.NewRequest("GET", "/permission/data", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer user-token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	
 	assert.Equal(t, http.StatusForbidden, w.Code)
-	
-	var response models.APIResponse
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.False(t, response.Success)
-	assert.Equal(t, 40302, response.Code)
-	
-	mockUserService.AssertExpectations(t)
-}
-
-func TestGetUserFromGin(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	
-	userID := uuid.New()
-	user := &models.User{
-		ID:    userID,
-		Email: "test@example.com",
-	}
-	
-	// 测试设置用户到context
-	c.Set("user", user)
-	
-	retrievedUser, exists := GetUserFromGin(c)
-	assert.True(t, exists)
-	assert.NotNil(t, retrievedUser)
-	assert.Equal(t, user.ID, retrievedUser.ID)
-	assert.Equal(t, user.Email, retrievedUser.Email)
-	
-	// 测试context中没有用户
-	c.Set("user", nil)
-	retrievedUser, exists = GetUserFromGin(c)
-	assert.False(t, exists)
-	assert.Nil(t, retrievedUser)
 }

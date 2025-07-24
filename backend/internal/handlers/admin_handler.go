@@ -15,17 +15,17 @@ import (
 
 // AdminHandler 管理员处理器
 type AdminHandler struct {
-	userService services.UserService
-	validator   *validator.Validate
-	logger      *zap.Logger
+	adminService services.AdminService  // 只依赖AdminService接口！
+	validator    *validator.Validate
+	logger       *zap.Logger
 }
 
 // NewAdminHandler 创建管理员处理器
-func NewAdminHandler(userService services.UserService, validator *validator.Validate, logger *zap.Logger) *AdminHandler {
+func NewAdminHandler(adminService services.AdminService, validator *validator.Validate, logger *zap.Logger) *AdminHandler {
 	return &AdminHandler{
-		userService: userService,
-		validator:   validator,
-		logger:      logger,
+		adminService: adminService,
+		validator:    validator,
+		logger:       logger,
 	}
 }
 
@@ -74,7 +74,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	result, err := h.userService.ListUsers(c.Request.Context(), &query)
+	result, err := h.adminService.ListUsers(c.Request.Context(), &query)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -105,7 +105,7 @@ func (h *AdminHandler) GetUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.GetUserByID(c.Request.Context(), userID)
+	user, err := h.adminService.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -153,7 +153,7 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.UpdateUserStatus(c.Request.Context(), userID, &req)
+	err = h.adminService.UpdateUserStatus(c.Request.Context(), userID, &req)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -205,7 +205,7 @@ func (h *AdminHandler) AssignRole(c *gin.Context) {
 	}
 
 	adminUser, _ := middleware.GetUserFromGin(c)
-	err = h.userService.AssignRole(c.Request.Context(), userID, req.RoleID, adminUser.ID, req.ExpiresAt)
+	err = h.adminService.AssignRole(c.Request.Context(), userID, req.RoleID, adminUser.ID, req.ExpiresAt)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -250,7 +250,7 @@ func (h *AdminHandler) RevokeRole(c *gin.Context) {
 		return
 	}
 
-	err = h.userService.RevokeRole(c.Request.Context(), userID, roleID)
+	err = h.adminService.RevokeRole(c.Request.Context(), userID, roleID)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return
@@ -286,7 +286,7 @@ func (h *AdminHandler) GetLoginLogs(c *gin.Context) {
 		return
 	}
 
-	result, err := h.userService.GetUserLoginLogs(c.Request.Context(), &query)
+	result, err := h.adminService.GetUserLoginLogs(c.Request.Context(), &query)
 	if err != nil {
 		h.handleServiceError(c, err)
 		return

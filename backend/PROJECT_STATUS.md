@@ -119,7 +119,7 @@ user_sessions        ✅ 用户会话表
 ### 环境配置 🆕
 ```bash
 # 1. 复制环境变量模板
-cp configs/app.env.example configs/app.env
+cp configs/app.example.yaml configs/app.env
 
 # 2. 编辑配置文件，设置你的环境
 # - 数据库连接信息

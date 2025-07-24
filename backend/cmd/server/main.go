@@ -22,14 +22,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/OrAura/backend/internal/config"
-	"github.com/OrAura/backend/internal/handlers"
-	"github.com/OrAura/backend/internal/middleware"
-	"github.com/OrAura/backend/internal/models"
-	"github.com/OrAura/backend/internal/routes"
-	"github.com/OrAura/backend/internal/services"
-	"github.com/OrAura/backend/internal/store"
-	"github.com/OrAura/backend/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	swaggerFiles "github.com/swaggo/files"
@@ -38,6 +30,15 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/OrAura/backend/internal/config"
+	"github.com/OrAura/backend/internal/handlers"
+	"github.com/OrAura/backend/internal/middleware"
+	"github.com/OrAura/backend/internal/models"
+	"github.com/OrAura/backend/internal/routes"
+	"github.com/OrAura/backend/internal/services"
+	"github.com/OrAura/backend/internal/store"
+	"github.com/OrAura/backend/internal/utils"
 
 	_ "github.com/OrAura/backend/docs" // Import generated docs
 )
@@ -170,7 +171,7 @@ func main() {
 
 	// 启动服务器
 	serverAddr := cfg.GetServerAddress()
-	zapLogger.Info("Starting OrAura Backend Service", 
+	zapLogger.Info("Starting OrAura Backend Service",
 		zap.String("address", serverAddr),
 		zap.String("mode", cfg.Server.Mode),
 	)
@@ -315,7 +316,7 @@ func initializeSuperAdmin(db *gorm.DB, cfg *config.Config, logger *zap.Logger) e
 		return err
 	}
 
-	logger.Info("Super admin created successfully", 
+	logger.Info("Super admin created successfully",
 		zap.String("email", adminEmail),
 		zap.String("username", adminUsername))
 

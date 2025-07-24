@@ -20,16 +20,16 @@ const (
 	UserKey UserContextKey = "user"
 )
 
-// AuthMiddleware 认证中间件
+// AuthMiddleware 认证中间件 - 现在使用小接口
 type AuthMiddleware struct {
-	userService services.UserService
+	authService services.AuthService  // 改为只依赖AuthService！
 	logger      *zap.Logger
 }
 
 // NewAuthMiddleware 创建认证中间件
-func NewAuthMiddleware(userService services.UserService, logger *zap.Logger) *AuthMiddleware {
+func NewAuthMiddleware(authService services.AuthService, logger *zap.Logger) *AuthMiddleware {
 	return &AuthMiddleware{
-		userService: userService,
+		authService: authService,
 		logger:      logger,
 	}
 }
@@ -57,21 +57,21 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
+		// 检查令牌是否在黑名单中
+		isBlacklisted, err := m.authService.IsTokenBlacklisted(c.Request.Context(), accessToken)
+		if err != nil {
+			m.logger.Error("Failed to check token blacklist", zap.Error(err))
+			// 黑名单检查失败时，继续验证令牌（降级处理）
+		} else if isBlacklisted {
+			m.respondWithError(c, http.StatusUnauthorized, 40103, "Token has been revoked")
+			return
+		}
+
 		// 验证访问令牌
-		user, err := m.userService.ValidateAccessToken(c.Request.Context(), accessToken)
+		user, err := m.authService.ValidateAccessToken(c.Request.Context(), accessToken)
 		if err != nil {
 			m.logger.Warn("Invalid access token", zap.Error(err))
-			
-			switch err {
-			case services.ErrTokenExpired:
-				m.respondWithError(c, http.StatusUnauthorized, 40102, "Token expired")
-			case services.ErrTokenInvalid:
-				m.respondWithError(c, http.StatusUnauthorized, 40103, "Invalid token")
-			case services.ErrUserNotActive:
-				m.respondWithError(c, http.StatusForbidden, 40301, "User account is not active")
-			default:
-				m.respondWithError(c, http.StatusUnauthorized, 40101, "Unauthorized")
-			}
+			m.respondWithError(c, http.StatusUnauthorized, 40101, "Invalid or expired token")
 			return
 		}
 
@@ -109,7 +109,7 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		}
 
 		// 尝试验证访问令牌
-		user, err := m.userService.ValidateAccessToken(c.Request.Context(), accessToken)
+		user, err := m.authService.ValidateAccessToken(c.Request.Context(), accessToken)
 		if err != nil {
 			// 记录错误但不阻止请求
 			m.logger.Debug("Optional auth failed", zap.Error(err))
@@ -165,7 +165,7 @@ func (m *AuthMiddleware) RequirePermission(resource, action string) gin.HandlerF
 		}
 
 		// 检查用户是否有所需权限
-		hasPermission, err := m.userService.HasPermission(c.Request.Context(), user.ID, resource, action)
+		hasPermission, err := m.authService.HasPermission(c.Request.Context(), user.ID, resource, action)
 		if err != nil {
 			m.logger.Error("Failed to check user permission", 
 				zap.Error(err),

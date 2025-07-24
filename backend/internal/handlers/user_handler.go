@@ -37,7 +37,7 @@ func NewUserHandler(userService services.UserService, validator *validator.Valid
 // @Param request body models.RegisterRequest true "注册信息"
 // @Success 201 {object} models.APIResponse{data=models.UserInfo}
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/register [post]
+// @Router /auth/register [post]
 func (h *UserHandler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -71,7 +71,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 // @Success 200 {object} models.APIResponse{data=models.TokenResponse}
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/auth/login [post]
+// @Router /auth/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -105,7 +105,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 // @Success 200 {object} models.APIResponse{data=models.TokenResponse}
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/auth/refresh [post]
+// @Router /auth/refresh [post]
 func (h *UserHandler) RefreshToken(c *gin.Context) {
 	var req models.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,7 +136,7 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 // @Security BearerAuth
 // @Success 200 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/auth/logout [post]
+// @Router /auth/logout [post]
 func (h *UserHandler) Logout(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -174,7 +174,7 @@ func (h *UserHandler) Logout(c *gin.Context) {
 // @Success 200 {object} models.APIResponse{data=models.UserInfo}
 // @Failure 401 {object} models.APIResponse
 // @Failure 404 {object} models.APIResponse
-// @Router /api/v1/users/profile [get]
+// @Router /users/profile [get]
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -203,7 +203,7 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 // @Success 200 {object} models.APIResponse{data=models.UserInfo}
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/users/profile [put]
+// @Router /users/profile [put]
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -244,7 +244,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 // @Success 200 {object} models.APIResponse
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/users/password [put]
+// @Router /users/password [put]
 func (h *UserHandler) ChangePassword(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -283,7 +283,7 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 // @Param request body models.ForgotPasswordRequest true "忘记密码请求"
 // @Success 200 {object} models.APIResponse
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/forgot-password [post]
+// @Router /auth/forgot-password [post]
 func (h *UserHandler) ForgotPassword(c *gin.Context) {
 	var req models.ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -315,7 +315,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 // @Param request body models.ResetPasswordRequest true "重置密码请求"
 // @Success 200 {object} models.APIResponse
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/reset-password [post]
+// @Router /auth/reset-password [post]
 func (h *UserHandler) ResetPassword(c *gin.Context) {
 	var req models.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -347,7 +347,7 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 // @Param request body models.OAuthLoginRequest true "Google OAuth 登录请求"
 // @Success 200 {object} models.APIResponse{data=models.TokenResponse}
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/oauth/google [post]
+// @Router /auth/oauth/google [post]
 func (h *UserHandler) LoginWithGoogle(c *gin.Context) {
 	var req models.OAuthLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -379,7 +379,7 @@ func (h *UserHandler) LoginWithGoogle(c *gin.Context) {
 // @Param request body models.OAuthLoginRequest true "Apple OAuth 登录请求"
 // @Success 200 {object} models.APIResponse{data=models.TokenResponse}
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/oauth/apple [post]
+// @Router /auth/oauth/apple [post]
 func (h *UserHandler) LoginWithApple(c *gin.Context) {
 	var req models.OAuthLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -413,7 +413,7 @@ func (h *UserHandler) LoginWithApple(c *gin.Context) {
 // @Success 200 {object} models.APIResponse
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/users/account [delete]
+// @Router /users/account [delete]
 func (h *UserHandler) DeleteAccount(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -454,7 +454,7 @@ func (h *UserHandler) DeleteAccount(c *gin.Context) {
 // @Success 200 {object} models.APIResponse{data=models.AvatarUploadResponse}
 // @Failure 400 {object} models.APIResponse
 // @Failure 401 {object} models.APIResponse
-// @Router /api/v1/users/avatar [post]
+// @Router /users/avatar [post]
 func (h *UserHandler) UploadAvatar(c *gin.Context) {
 	userID, exists := middleware.GetUserIDFromGin(c)
 	if !exists {
@@ -497,7 +497,7 @@ func (h *UserHandler) UploadAvatar(c *gin.Context) {
 // @Param request body models.VerifyEmailRequest true "验证邮箱请求"
 // @Success 200 {object} models.APIResponse{data=models.UserInfo}
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/verify-email [post]
+// @Router /auth/verify-email [post]
 func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	var req models.VerifyEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -530,7 +530,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 // @Param request body models.ResendVerificationRequest true "重新发送验证邮件请求"
 // @Success 200 {object} models.APIResponse
 // @Failure 400 {object} models.APIResponse
-// @Router /api/v1/auth/resend-verification [post]
+// @Router /auth/resend-verification [post]
 func (h *UserHandler) ResendVerificationEmail(c *gin.Context) {
 	var req models.ResendVerificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

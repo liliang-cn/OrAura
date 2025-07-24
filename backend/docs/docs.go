@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/auth/forgot-password": {
+        "/auth/forgot-password": {
             "post": {
                 "description": "发送密码重置邮件",
                 "consumes": [
@@ -64,7 +64,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/login": {
+        "/auth/login": {
             "post": {
                 "description": "用户邮箱密码登录",
                 "consumes": [
@@ -122,7 +122,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/logout": {
+        "/auth/logout": {
             "post": {
                 "security": [
                     {
@@ -153,7 +153,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/oauth/apple": {
+        "/auth/oauth/apple": {
             "post": {
                 "description": "使用 Apple 账户登录",
                 "consumes": [
@@ -205,7 +205,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/oauth/google": {
+        "/auth/oauth/google": {
             "post": {
                 "description": "使用 Google 账户登录",
                 "consumes": [
@@ -257,7 +257,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/refresh": {
+        "/auth/refresh": {
             "post": {
                 "description": "使用刷新令牌获取新的访问令牌",
                 "consumes": [
@@ -315,7 +315,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/register": {
+        "/auth/register": {
             "post": {
                 "description": "创建新用户账户",
                 "consumes": [
@@ -367,7 +367,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/resend-verification": {
+        "/auth/resend-verification": {
             "post": {
                 "description": "重新发送邮箱验证邮件",
                 "consumes": [
@@ -407,7 +407,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/reset-password": {
+        "/auth/reset-password": {
             "post": {
                 "description": "使用重置令牌重置密码",
                 "consumes": [
@@ -447,7 +447,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/verify-email": {
+        "/auth/verify-email": {
             "post": {
                 "description": "使用验证令牌验证用户邮箱",
                 "consumes": [
@@ -499,7 +499,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/account": {
+        "/users/account": {
             "delete": {
                 "security": [
                     {
@@ -550,7 +550,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/avatar": {
+        "/users/avatar": {
             "post": {
                 "security": [
                     {
@@ -611,7 +611,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/password": {
+        "/users/password": {
             "put": {
                 "security": [
                     {
@@ -662,7 +662,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/profile": {
+        "/users/profile": {
             "get": {
                 "security": [
                     {

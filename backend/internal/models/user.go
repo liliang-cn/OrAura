@@ -198,6 +198,18 @@ type Location struct {
 	Lon     float64 `json:"lon"`
 }
 
+// EmailVerification 邮箱验证记录
+type EmailVerification struct {
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	Token     string    `gorm:"size:64;not null;unique" json:"token"`  
+	ExpiresAt time.Time `gorm:"not null;index" json:"expires_at"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	
+	// 关联
+	User *User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
+}
+
 // Scan 实现 sql.Scanner 接口
 func (l *Location) Scan(value interface{}) error {
 	if value == nil {

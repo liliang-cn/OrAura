@@ -1,0 +1,709 @@
+basePath: /api/v1
+definitions:
+  models.APIResponse:
+    properties:
+      code:
+        description: 错误码
+        type: integer
+      data:
+        description: 数据
+      errors:
+        description: 字段错误列表
+        items:
+          $ref: '#/definitions/models.FieldError'
+        type: array
+      message:
+        description: 消息
+        type: string
+    type: object
+  models.AvatarUploadResponse:
+    properties:
+      avatar_url:
+        type: string
+    type: object
+  models.ChangePasswordRequest:
+    properties:
+      confirm_password:
+        type: string
+      current_password:
+        type: string
+      new_password:
+        maxLength: 128
+        minLength: 8
+        type: string
+    required:
+    - confirm_password
+    - current_password
+    - new_password
+    type: object
+  models.DeleteAccountRequest:
+    properties:
+      confirmation:
+        type: string
+      password:
+        type: string
+    required:
+    - confirmation
+    - password
+    type: object
+  models.FieldError:
+    properties:
+      field:
+        description: 字段名
+        type: string
+      message:
+        description: 错误信息
+        type: string
+    type: object
+  models.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.NotificationSettings:
+    properties:
+      email:
+        type: boolean
+      push:
+        type: boolean
+    type: object
+  models.OAuthLoginRequest:
+    properties:
+      access_token:
+        type: string
+      id_token:
+        type: string
+      user_info:
+        $ref: '#/definitions/models.OAuthUserInfo'
+    required:
+    - access_token
+    type: object
+  models.OAuthName:
+    properties:
+      firstName:
+        type: string
+      fullName:
+        type: string
+      lastName:
+        type: string
+    type: object
+  models.OAuthUserInfo:
+    properties:
+      email:
+        type: string
+      name:
+        $ref: '#/definitions/models.OAuthName'
+    type: object
+  models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.RegisterRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 128
+        minLength: 8
+        type: string
+      timezone:
+        maxLength: 50
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - timezone
+    - username
+    type: object
+  models.ResendVerificationRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  models.ResetPasswordRequest:
+    properties:
+      confirm_password:
+        type: string
+      new_password:
+        maxLength: 128
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - confirm_password
+    - new_password
+    - token
+    type: object
+  models.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      is_new_user:
+        type: boolean
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/models.UserInfo'
+    type: object
+  models.UpdateProfileRequest:
+    properties:
+      nickname:
+        maxLength: 100
+        type: string
+      preferences:
+        $ref: '#/definitions/models.UserPreferences'
+      timezone:
+        maxLength: 50
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    type: object
+  models.UserInfo:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      nickname:
+        type: string
+      oauth_provider:
+        type: string
+      preferences:
+        $ref: '#/definitions/models.UserPreferences'
+      timezone:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  models.UserPreferences:
+    properties:
+      language:
+        type: string
+      notifications:
+        $ref: '#/definitions/models.NotificationSettings'
+      theme:
+        type: string
+    type: object
+  models.VerifyEmailRequest:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@oraura.app
+    name: OrAura API Support
+    url: https://oraura.app/support
+  description: OrAura spiritual divination application backend service with user management
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: https://oraura.app/terms
+  title: OrAura Backend API
+  version: "1.0"
+paths:
+  /api/v1/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: 发送密码重置邮件
+      parameters:
+      - description: 忘记密码请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 忘记密码
+      tags:
+      - 认证
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 用户邮箱密码登录
+      parameters:
+      - description: 登录信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.TokenResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 用户登录
+      tags:
+      - 认证
+  /api/v1/auth/logout:
+    post:
+      description: 注销用户会话，使令牌失效
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 用户注销
+      tags:
+      - 认证
+  /api/v1/auth/oauth/apple:
+    post:
+      consumes:
+      - application/json
+      description: 使用 Apple 账户登录
+      parameters:
+      - description: Apple OAuth 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.OAuthLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.TokenResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Apple OAuth 登录
+      tags:
+      - OAuth
+  /api/v1/auth/oauth/google:
+    post:
+      consumes:
+      - application/json
+      description: 使用 Google 账户登录
+      parameters:
+      - description: Google OAuth 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.OAuthLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.TokenResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Google OAuth 登录
+      tags:
+      - OAuth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 使用刷新令牌获取新的访问令牌
+      parameters:
+      - description: 刷新令牌请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.TokenResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 刷新访问令牌
+      tags:
+      - 认证
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 创建新用户账户
+      parameters:
+      - description: 注册信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 用户注册
+      tags:
+      - 认证
+  /api/v1/auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: 重新发送邮箱验证邮件
+      parameters:
+      - description: 重新发送验证邮件请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ResendVerificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 重新发送验证邮件
+      tags:
+      - 认证
+  /api/v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: 使用重置令牌重置密码
+      parameters:
+      - description: 重置密码请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 重置密码
+      tags:
+      - 认证
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: 使用验证令牌验证用户邮箱
+      parameters:
+      - description: 验证邮箱请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.VerifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: 验证邮箱
+      tags:
+      - 认证
+  /api/v1/users/account:
+    delete:
+      consumes:
+      - application/json
+      description: 永久删除用户账户及所有相关数据
+      parameters:
+      - description: 删除账户确认
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.DeleteAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除账户
+      tags:
+      - 用户
+  /api/v1/users/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传用户头像图片
+      parameters:
+      - description: 头像文件
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AvatarUploadResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 上传头像
+      tags:
+      - 用户
+  /api/v1/users/password:
+    put:
+      consumes:
+      - application/json
+      description: 修改当前用户的密码
+      parameters:
+      - description: 修改密码信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 修改密码
+      tags:
+      - 用户
+  /api/v1/users/profile:
+    get:
+      description: 获取当前用户的详细信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserInfo'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户信息
+      tags:
+      - 用户
+    put:
+      consumes:
+      - application/json
+      description: 更新当前用户的个人信息
+      parameters:
+      - description: 更新信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新用户信息
+      tags:
+      - 用户
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

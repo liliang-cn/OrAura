@@ -44,11 +44,19 @@ type UserRepository interface {
 	GetPasswordResetToken(ctx context.Context, tokenHash string) (*models.PasswordResetToken, error)
 	UpdatePasswordResetToken(ctx context.Context, token *models.PasswordResetToken) error
 	DeletePasswordResetToken(ctx context.Context, tokenHash string) error
+	DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error
 	CleanExpiredPasswordResetTokens(ctx context.Context) error
 	
 	// 登录日志操作
 	CreateLoginLog(ctx context.Context, log *models.UserLoginLog) error
 	GetUserLoginLogs(ctx context.Context, userID uuid.UUID, limit int) ([]models.UserLoginLog, error)
+	
+	// 邮箱验证操作
+	CreateEmailVerification(ctx context.Context, verification *models.EmailVerification) error
+	GetEmailVerificationByToken(ctx context.Context, token string) (*models.EmailVerification, error)
+	DeleteEmailVerification(ctx context.Context, id uuid.UUID) error
+	DeleteEmailVerificationByUserID(ctx context.Context, userID uuid.UUID) error
+	CleanExpiredEmailVerifications(ctx context.Context) error
 	
 	// 统计操作
 	CountUsers(ctx context.Context) (int64, error)
@@ -225,6 +233,10 @@ func (r *userRepository) DeletePasswordResetToken(ctx context.Context, tokenHash
 	return r.db.WithContext(ctx).Delete(&models.PasswordResetToken{}, "token_hash = ?", tokenHash).Error
 }
 
+func (r *userRepository) DeleteUserPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&models.PasswordResetToken{}, "user_id = ?", userID).Error
+}
+
 func (r *userRepository) CleanExpiredPasswordResetTokens(ctx context.Context) error {
 	return r.db.WithContext(ctx).Delete(&models.PasswordResetToken{}, "expires_at < ?", time.Now()).Error
 }
@@ -258,4 +270,36 @@ func (r *userRepository) CountActiveUsers(ctx context.Context, since time.Time) 
 		Distinct("users.id").
 		Count(&count).Error
 	return count, err
+}
+
+// 邮箱验证操作实现
+
+func (r *userRepository) CreateEmailVerification(ctx context.Context, verification *models.EmailVerification) error {
+	return r.db.WithContext(ctx).Create(verification).Error
+}
+
+func (r *userRepository) GetEmailVerificationByToken(ctx context.Context, token string) (*models.EmailVerification, error) {
+	var verification models.EmailVerification
+	err := r.db.WithContext(ctx).Where("token = ?", token).First(&verification).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &verification, nil
+}
+
+func (r *userRepository) DeleteEmailVerification(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&models.EmailVerification{}, "id = ?", id).Error
+}
+
+func (r *userRepository) DeleteEmailVerificationByUserID(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&models.EmailVerification{}, "user_id = ?", userID).Error
+}
+
+func (r *userRepository) CleanExpiredEmailVerifications(ctx context.Context) error {
+	return r.db.WithContext(ctx).
+		Where("expires_at < ?", time.Now()).
+		Delete(&models.EmailVerification{}).Error
 }

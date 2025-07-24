@@ -22,8 +22,8 @@ type LoginRequest struct {
 
 // OAuth 登录请求
 type OAuthLoginRequest struct {
-	IDToken     string         `json:"id_token" validate:"required"`
-	AccessToken *string        `json:"access_token,omitempty"`
+	IDToken     string         `json:"id_token,omitempty"`
+	AccessToken string         `json:"access_token" validate:"required"`
 	UserInfo    *OAuthUserInfo `json:"user_info,omitempty"`
 }
 
@@ -33,10 +33,21 @@ type OAuthUserInfo struct {
 	Email *string    `json:"email,omitempty"`
 }
 
+// OAuth 内部用户信息（用于服务间传递）
+type OAuthUserProfile struct {
+	Provider   string     `json:"provider"`
+	ProviderID string     `json:"provider_id"`
+	Email      string     `json:"email"`
+	Name       *OAuthName `json:"name,omitempty"`
+	AvatarURL  string     `json:"avatar_url,omitempty"`
+	Locale     string     `json:"locale,omitempty"`
+}
+
 // OAuth 姓名信息
 type OAuthName struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+	FullName  string `json:"fullName,omitempty"`
 }
 
 // Token 刷新请求
@@ -105,6 +116,16 @@ type UserInfo struct {
 // 头像上传响应
 type AvatarUploadResponse struct {
 	AvatarURL string `json:"avatar_url"`
+}
+
+// 邮箱验证请求
+type VerifyEmailRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
+// 重新发送验证邮件请求
+type ResendVerificationRequest struct {
+	Email string `json:"email" validate:"required,email"`
 }
 
 // API 统一响应格式

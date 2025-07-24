@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -39,6 +43,10 @@ type UserService interface {
 	LoginWithGoogle(ctx context.Context, req *models.OAuthLoginRequest) (*models.TokenResponse, error)
 	LoginWithApple(ctx context.Context, req *models.OAuthLoginRequest) (*models.TokenResponse, error)
 	
+	// 邮箱验证相关
+	VerifyEmail(ctx context.Context, token string) (*models.User, error)
+	ResendVerificationEmail(ctx context.Context, email string) error
+	
 	// 用户信息管理
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*models.UserInfo, error)
 	UpdateUserProfile(ctx context.Context, userID uuid.UUID, req *models.UpdateProfileRequest) (*models.UserInfo, error)
@@ -57,9 +65,11 @@ type UserService interface {
 
 // userService 用户服务实现
 type userService struct {
-	userRepo   store.UserRepository
-	jwtManager *utils.JWTManager
-	logger     *zap.Logger
+	userRepo     store.UserRepository
+	oauthService OAuthService
+	emailService EmailVerificationService
+	jwtManager   *utils.JWTManager
+	logger       *zap.Logger
 }
 
 // NewUserService 创建用户服务
@@ -68,6 +78,27 @@ func NewUserService(userRepo store.UserRepository, jwtManager *utils.JWTManager,
 		userRepo:   userRepo,
 		jwtManager: jwtManager,
 		logger:     logger,
+	}
+}
+
+// NewUserServiceWithOAuth 创建带OAuth支持的用户服务
+func NewUserServiceWithOAuth(userRepo store.UserRepository, oauthService OAuthService, jwtManager *utils.JWTManager, logger *zap.Logger) UserService {
+	return &userService{
+		userRepo:     userRepo,
+		oauthService: oauthService,
+		jwtManager:   jwtManager,
+		logger:       logger,
+	}
+}
+
+// NewUserServiceComplete 创建完整功能的用户服务
+func NewUserServiceComplete(userRepo store.UserRepository, oauthService OAuthService, emailService EmailVerificationService, jwtManager *utils.JWTManager, logger *zap.Logger) UserService {
+	return &userService{
+		userRepo:     userRepo,
+		oauthService: oauthService,
+		emailService: emailService,
+		jwtManager:   jwtManager,
+		logger:       logger,
 	}
 }
 
@@ -136,6 +167,25 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	user.Profile = profile
 	
 	s.logger.Info("User registered successfully", zap.String("user_id", user.ID.String()), zap.String("email", user.Email))
+	
+	// 发送验证邮件（如果邮件服务可用）
+	if s.emailService != nil {
+		go func() {
+			token, err := s.emailService.GenerateVerificationToken(context.Background(), user.ID)
+			if err != nil {
+				s.logger.Error("Failed to generate verification token", zap.Error(err))
+				return
+			}
+			
+			// 这里应该使用 EmailService.SendVerificationEmail，但需要创建一个 emailService 实例
+			// 暂时跳过实际发送，记录日志
+			s.logger.Info("Verification email should be sent", 
+				zap.String("email", user.Email),
+				zap.String("token", token),
+			)
+		}()
+	}
+	
 	return user, nil
 }
 
@@ -473,26 +523,365 @@ func (s *userService) logFailedLogin(ctx context.Context, userID uuid.UUID, logi
 
 // 其他方法的实现（OAuth、忘记密码、删除账户等）将在后续实现
 func (s *userService) LoginWithGoogle(ctx context.Context, req *models.OAuthLoginRequest) (*models.TokenResponse, error) {
-	// TODO: 实现 Google OAuth 登录
-	return nil, errors.New("not implemented")
+	if s.oauthService == nil {
+		s.logger.Error("OAuth service not configured")
+		return nil, errors.New("OAuth service not available")
+	}
+
+	// 验证Google访问令牌
+	oauthUser, err := s.oauthService.VerifyGoogleToken(ctx, req.AccessToken)
+	if err != nil {
+		s.logger.Error("Failed to verify Google token", zap.Error(err))
+		return nil, ErrInvalidCredentials
+	}
+
+	return s.handleOAuthLogin(ctx, oauthUser)
 }
 
 func (s *userService) LoginWithApple(ctx context.Context, req *models.OAuthLoginRequest) (*models.TokenResponse, error) {
-	// TODO: 实现 Apple OAuth 登录
-	return nil, errors.New("not implemented")
+	if s.oauthService == nil {
+		s.logger.Error("OAuth service not configured")
+		return nil, errors.New("OAuth service not available")
+	}
+
+	// 验证Apple访问令牌
+	oauthUser, err := s.oauthService.VerifyAppleToken(ctx, req.AccessToken)
+	if err != nil {
+		s.logger.Error("Failed to verify Apple token", zap.Error(err))
+		return nil, ErrInvalidCredentials
+	}
+
+	return s.handleOAuthLogin(ctx, oauthUser)
+}
+
+// handleOAuthLogin 处理OAuth登录的通用逻辑
+func (s *userService) handleOAuthLogin(ctx context.Context, oauthUser *models.OAuthUserProfile) (*models.TokenResponse, error) {
+	// 检查用户是否已存在
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, oauthUser.Email)
+	if err != nil {
+		s.logger.Error("Failed to check existing user by email", zap.Error(err))
+		return nil, err
+	}
+
+	var user *models.User
+	if existingUser != nil {
+		// 用户已存在，更新OAuth信息
+		user = existingUser
+		if !user.IsActive() {
+			return nil, ErrUserNotActive
+		}
+
+		// 记录登录日志 
+		if oauthUser.Provider == "google" {
+			s.logSuccessfulLogin(ctx, user.ID, models.LoginTypeGoogle)
+		} else if oauthUser.Provider == "apple" {
+			s.logSuccessfulLogin(ctx, user.ID, models.LoginTypeApple)
+		} else {
+			s.logSuccessfulLogin(ctx, user.ID, models.LoginTypePassword) // fallback
+		}
+	} else {
+		// 用户不存在，创建新用户
+		user, err = s.createOAuthUser(ctx, oauthUser)
+		if err != nil {
+			s.logger.Error("Failed to create OAuth user", zap.Error(err))
+			return nil, err
+		}
+	}
+
+	// 生成令牌
+	return s.generateTokens(ctx, user)
+}
+
+// createOAuthUser 创建OAuth用户
+func (s *userService) createOAuthUser(ctx context.Context, oauthUser *models.OAuthUserProfile) (*models.User, error) {
+	// 生成用户名（基于邮箱前缀）
+	username := generateUsernameFromEmail(oauthUser.Email)
+	
+	// 确保用户名唯一
+	for i := 0; i < 10; i++ {
+		existingUser, err := s.userRepo.GetUserByUsername(ctx, username)
+		if err != nil {
+			s.logger.Error("Failed to check username availability", zap.Error(err))
+			return nil, err
+		}
+		if existingUser == nil {
+			break // 用户名可用
+		}
+		// 用户名已存在，添加随机后缀
+		username = generateUsernameFromEmail(oauthUser.Email) + generateRandomSuffix()
+	}
+
+	// 创建用户
+	user := &models.User{
+		Email:         oauthUser.Email,
+		Username:      username,
+		PasswordHash:  nil, // OAuth用户无密码
+		Status:        models.UserStatusActive,
+		EmailVerified: true, // OAuth用户邮箱已验证
+		OAuthProvider: &oauthUser.Provider,
+		OAuthSubject:  &oauthUser.ProviderID,
+	}
+
+	err := s.userRepo.CreateUser(ctx, user)
+	if err != nil {
+		s.logger.Error("Failed to create OAuth user", zap.Error(err))
+		return nil, err
+	}
+
+	// 创建用户资料（从OAuth信息填充）
+	profile := &models.UserProfile{
+		UserID:   user.ID,
+		Nickname: &oauthUser.Name.FullName,
+		AvatarURL: &oauthUser.AvatarURL,
+		Timezone: "UTC",
+	}
+
+	if oauthUser.Locale != "" {
+		profile.Timezone = oauthUser.Locale
+	}
+
+	err = s.userRepo.CreateUserProfile(ctx, profile)
+	if err != nil {
+		s.logger.Error("Failed to create user profile for OAuth user", zap.Error(err))
+		// 这里不返回错误，因为用户已创建
+	}
+
+	// 记录登录日志
+	if oauthUser.Provider == "google" {
+		s.logSuccessfulLogin(ctx, user.ID, models.LoginTypeGoogle)
+	} else if oauthUser.Provider == "apple" {
+		s.logSuccessfulLogin(ctx, user.ID, models.LoginTypeApple)
+	} else {
+		s.logSuccessfulLogin(ctx, user.ID, models.LoginTypePassword) // fallback
+	}
+
+	s.logger.Info("OAuth user created successfully", 
+		zap.String("user_id", user.ID.String()),
+		zap.String("provider", oauthUser.Provider),
+		zap.String("email", user.Email),
+	)
+
+	return user, nil
 }
 
 func (s *userService) ForgotPassword(ctx context.Context, req *models.ForgotPasswordRequest) error {
-	// TODO: 实现忘记密码功能
-	return errors.New("not implemented")
+	// 获取用户
+	user, err := s.userRepo.GetUserByEmail(ctx, strings.ToLower(req.Email))
+	if err != nil {
+		s.logger.Error("Failed to get user by email", zap.Error(err))
+		return err
+	}
+	
+	if user == nil {
+		// 为了安全起见，即使用户不存在也返回成功
+		s.logger.Info("Password reset requested for non-existent email", zap.String("email", req.Email))
+		return nil
+	}
+	
+	if user.IsOAuthUser() {
+		// OAuth用户无法重置密码
+		s.logger.Info("Password reset requested for OAuth user", zap.String("user_id", user.ID.String()))
+		return fmt.Errorf("OAuth users cannot reset password")
+	}
+	
+	// 生成重置令牌
+	resetToken, err := s.generatePasswordResetToken(ctx, user.ID)
+	if err != nil {
+		s.logger.Error("Failed to generate password reset token", zap.Error(err))
+		return err
+	}
+	
+	// 发送重置邮件（如果邮件服务可用）
+	if s.emailService != nil {
+		// 这里需要有一个单独的邮件服务来发送密码重置邮件
+		// 暂时记录日志
+		s.logger.Info("Password reset email should be sent", 
+			zap.String("email", user.Email),
+			zap.String("token", resetToken),
+		)
+	}
+	
+	s.logger.Info("Password reset token generated", zap.String("user_id", user.ID.String()))
+	return nil
 }
 
 func (s *userService) ResetPassword(ctx context.Context, req *models.ResetPasswordRequest) error {
-	// TODO: 实现重置密码功能
-	return errors.New("not implemented")
+	// 验证重置令牌
+	tokenHash := utils.HashToken(req.Token)
+	
+	resetToken, err := s.userRepo.GetPasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		s.logger.Error("Failed to get password reset token", zap.Error(err))
+		return err
+	}
+	
+	if resetToken == nil {
+		return fmt.Errorf("invalid or expired reset token")
+	}
+	
+	// 检查令牌是否过期
+	if time.Now().After(resetToken.ExpiresAt) {
+		return fmt.Errorf("reset token expired")
+	}
+	
+	// 获取用户
+	user, err := s.userRepo.GetUserByID(ctx, resetToken.UserID)
+	if err != nil {
+		s.logger.Error("Failed to get user", zap.Error(err))
+		return err
+	}
+	
+	if user == nil {
+		return fmt.Errorf("user not found")
+	}
+	
+	// 验证密码
+	if req.NewPassword != req.ConfirmPassword {
+		return fmt.Errorf("passwords do not match")
+	}
+	
+	// 哈希新密码
+	passwordHash, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		s.logger.Error("Failed to hash password", zap.Error(err))
+		return err
+	}
+	
+	// 更新用户密码
+	user.PasswordHash = &passwordHash
+	err = s.userRepo.UpdateUser(ctx, user)
+	if err != nil {
+		s.logger.Error("Failed to update user password", zap.Error(err))
+		return err
+	}
+	
+	// 删除重置令牌
+	err = s.userRepo.DeletePasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		s.logger.Error("Failed to delete password reset token", zap.Error(err))
+		// 不返回错误，因为密码已成功重置
+	}
+	
+	// 使所有刷新令牌失效（强制重新登录）
+	err = s.userRepo.DeleteUserRefreshTokens(ctx, user.ID)
+	if err != nil {
+		s.logger.Error("Failed to delete user refresh tokens", zap.Error(err))
+		// 不返回错误
+	}
+	
+	s.logger.Info("Password reset successfully", zap.String("user_id", user.ID.String()))
+	return nil
+}
+
+// generatePasswordResetToken 生成密码重置令牌
+func (s *userService) generatePasswordResetToken(ctx context.Context, userID uuid.UUID) (string, error) {
+	// 生成32字节随机令牌
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	
+	token := hex.EncodeToString(tokenBytes)
+	tokenHash := utils.HashToken(token)
+	
+	// 删除用户的旧重置令牌
+	err := s.userRepo.DeleteUserPasswordResetTokens(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to delete old password reset tokens", zap.Error(err))
+		// 继续执行，不返回错误
+	}
+	
+	// 创建新的重置令牌
+	resetToken := &models.PasswordResetToken{
+		UserID:    userID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(1 * time.Hour), // 1小时后过期
+	}
+	
+	err = s.userRepo.CreatePasswordResetToken(ctx, resetToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to create reset token: %w", err)
+	}
+	
+	return token, nil
 }
 
 func (s *userService) DeleteAccount(ctx context.Context, userID uuid.UUID, req *models.DeleteAccountRequest) error {
 	// TODO: 实现删除账户功能
 	return errors.New("not implemented")
+}
+
+// VerifyEmail 验证邮箱
+func (s *userService) VerifyEmail(ctx context.Context, token string) (*models.User, error) {
+	if s.emailService == nil {
+		s.logger.Error("Email service not configured")
+		return nil, errors.New("email verification not available")
+	}
+	
+	user, err := s.emailService.VerifyEmailToken(ctx, token)
+	if err != nil {
+		s.logger.Error("Failed to verify email token", zap.Error(err))
+		return nil, err
+	}
+	
+	s.logger.Info("Email verified successfully", zap.String("user_id", user.ID.String()))
+	return user, nil
+}
+
+// ResendVerificationEmail 重新发送验证邮件
+func (s *userService) ResendVerificationEmail(ctx context.Context, email string) error {
+	if s.emailService == nil {
+		s.logger.Error("Email service not configured")
+		return errors.New("email verification not available")
+	}
+	
+	err := s.emailService.ResendVerificationEmail(ctx, email)
+	if err != nil {
+		s.logger.Error("Failed to resend verification email", zap.Error(err))
+		return err
+	}
+	
+	s.logger.Info("Verification email resent", zap.String("email", email))
+	return nil
+}
+
+// OAuth 辅助函数
+
+// generateUsernameFromEmail 从邮箱生成用户名
+func generateUsernameFromEmail(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) == 0 {
+		return "user"
+	}
+	
+	username := parts[0]
+	// 清理用户名，只保留字母数字和下划线
+	cleaned := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			return r
+		}
+		return -1
+	}, username)
+	
+	if len(cleaned) == 0 {
+		return "user"
+	}
+	
+	// 限制长度
+	if len(cleaned) > 20 {
+		cleaned = cleaned[:20]
+	}
+	
+	return strings.ToLower(cleaned)
+}
+
+// generateRandomSuffix 生成随机后缀
+func generateRandomSuffix() string {
+	// 生成4位随机数字
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		// 如果随机数生成失败，使用时间戳
+		return fmt.Sprintf("_%d", time.Now().Unix()%10000)
+	}
+	return fmt.Sprintf("_%04d", n.Int64())
 }

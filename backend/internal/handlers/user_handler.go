@@ -488,6 +488,72 @@ func (h *UserHandler) UploadAvatar(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// VerifyEmail 验证邮箱
+// @Summary 验证邮箱
+// @Description 使用验证令牌验证用户邮箱
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body models.VerifyEmailRequest true "验证邮箱请求"
+// @Success 200 {object} models.APIResponse{data=models.UserInfo}
+// @Failure 400 {object} models.APIResponse
+// @Router /api/v1/auth/verify-email [post]
+func (h *UserHandler) VerifyEmail(c *gin.Context) {
+	var req models.VerifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.validator.Struct(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	user, err := h.userService.VerifyEmail(c.Request.Context(), req.Token)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("Email verified successfully", zap.String("user_id", user.ID.String()))
+	response := models.NewSuccessResponse(user.ToUserInfo(), "Email verified successfully")
+	c.JSON(http.StatusOK, response)
+}
+
+// ResendVerificationEmail 重新发送验证邮件
+// @Summary 重新发送验证邮件
+// @Description 重新发送邮箱验证邮件
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body models.ResendVerificationRequest true "重新发送验证邮件请求"
+// @Success 200 {object} models.APIResponse
+// @Failure 400 {object} models.APIResponse
+// @Router /api/v1/auth/resend-verification [post]
+func (h *UserHandler) ResendVerificationEmail(c *gin.Context) {
+	var req models.ResendVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.validator.Struct(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	err := h.userService.ResendVerificationEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("Verification email resent", zap.String("email", req.Email))
+	response := models.NewSuccessResponse(nil, "Verification email sent successfully")
+	c.JSON(http.StatusOK, response)
+}
+
 // 私有方法
 
 // respondWithValidationError 返回验证错误响应

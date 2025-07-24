@@ -1,3 +1,20 @@
+// Package main OrAura Backend Service
+// @title OrAura Backend API
+// @version 1.0
+// @description OrAura spiritual divination application backend service with user management
+// @termsOfService https://oraura.app/terms
+// @contact.name OrAura API Support
+// @contact.url https://oraura.app/support
+// @contact.email support@oraura.app
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:8080
+// @BasePath /api/v1
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 package main
 
 import (
@@ -14,10 +31,14 @@ import (
 	"github.com/OrAura/backend/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	_ "github.com/OrAura/backend/docs" // Import generated docs
 )
 
 func main() {
@@ -54,6 +75,7 @@ func main() {
 		&models.JWTBlacklist{},
 		&models.PasswordResetToken{},
 		&models.UserLoginLog{},
+		&models.EmailVerification{},
 	)
 	if err != nil {
 		zapLogger.Fatal("cannot migrate database", zap.Error(err))
@@ -72,8 +94,22 @@ func main() {
 	// 初始化仓储层
 	userRepo := store.NewUserRepository(db)
 
+	// 初始化OAuth服务
+	oauthService := services.NewOAuthService(
+		cfg.OAuth.Google.ClientID,
+		cfg.OAuth.Google.ClientSecret,
+		cfg.OAuth.Apple.ClientID,
+		cfg.OAuth.Apple.ClientSecret,
+		zapLogger,
+	)
+
+	// 初始化邮件服务
+	emailProvider := services.NewMockEmailProvider(zapLogger)
+	emailService := services.NewEmailService(emailProvider, zapLogger)
+	emailVerificationService := services.NewEmailVerificationService(userRepo, emailService, zapLogger)
+
 	// 初始化服务层
-	userService := services.NewUserService(userRepo, jwtManager, zapLogger)
+	userService := services.NewUserServiceComplete(userRepo, oauthService, emailVerificationService, jwtManager, zapLogger)
 
 	// 初始化处理器
 	userHandler := handlers.NewUserHandler(userService, validate, zapLogger)
@@ -108,6 +144,9 @@ func main() {
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
 	routes.SetupUserRoutes(apiV1, userHandler, authMiddleware, rateLimitMiddleware)
+
+	// Swagger 文档路由
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// 启动服务器
 	serverAddr := cfg.GetServerAddress()

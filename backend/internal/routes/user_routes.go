@@ -41,6 +41,18 @@ func SetupUserRoutes(r *gin.RouterGroup, userHandler *handlers.UserHandler, auth
 			userHandler.ResetPassword,
 		)
 		
+		// 邮箱验证
+		auth.POST("/verify-email", 
+			rateLimitMiddleware.GlobalRateLimit(),
+			userHandler.VerifyEmail,
+		)
+		
+		// 重新发送验证邮件
+		auth.POST("/resend-verification", 
+			rateLimitMiddleware.LoginRateLimit(),
+			userHandler.ResendVerificationEmail,
+		)
+		
 		// OAuth 登录路由
 		oauth := auth.Group("/oauth")
 		{

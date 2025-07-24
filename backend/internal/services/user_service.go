@@ -86,6 +86,8 @@ type UserService interface {
 	DeleteUserSession(ctx context.Context, sessionID uuid.UUID) error
 	
 	// 管理员功能
+	GetDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error)
+	GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error)
 	ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error)
 	UpdateUserStatus(ctx context.Context, userID uuid.UUID, req *models.UpdateUserStatusRequest) error
 	GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error)
@@ -101,7 +103,7 @@ type userService struct {
 }
 
 // NewUserService 创建用户服务
-func NewUserService(userRepo store.UserRepository, jwtManager *utils.JWTManager, logger *zap.Logger) UserService {
+func NewUserService(userRepo store.UserRepository, jwtManager *utils.JWTManager, logger *zap.Logger) *userService {
 	return &userService{
 		userRepo:   userRepo,
 		jwtManager: jwtManager,
@@ -110,7 +112,7 @@ func NewUserService(userRepo store.UserRepository, jwtManager *utils.JWTManager,
 }
 
 // NewUserServiceWithOAuth 创建带OAuth支持的用户服务
-func NewUserServiceWithOAuth(userRepo store.UserRepository, oauthService OAuthService, jwtManager *utils.JWTManager, logger *zap.Logger) UserService {
+func NewUserServiceWithOAuth(userRepo store.UserRepository, oauthService OAuthService, jwtManager *utils.JWTManager, logger *zap.Logger) *userService {
 	return &userService{
 		userRepo:     userRepo,
 		oauthService: oauthService,
@@ -120,7 +122,7 @@ func NewUserServiceWithOAuth(userRepo store.UserRepository, oauthService OAuthSe
 }
 
 // NewUserServiceComplete 创建完整功能的用户服务
-func NewUserServiceComplete(userRepo store.UserRepository, oauthService OAuthService, emailService EmailVerificationService, jwtManager *utils.JWTManager, logger *zap.Logger) UserService {
+func NewUserServiceComplete(userRepo store.UserRepository, oauthService OAuthService, emailService EmailVerificationService, jwtManager *utils.JWTManager, logger *zap.Logger) *userService {
 	return &userService{
 		userRepo:     userRepo,
 		oauthService: oauthService,
@@ -1125,46 +1127,29 @@ func (s *userService) DeleteUserSession(ctx context.Context, sessionID uuid.UUID
 	return errors.New("not implemented yet")
 }
 
+// GetDashboardStats 获取仪表板统计信息
+func (s *userService) GetDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error) {
+	stats, err := s.userRepo.GetAdminDashboardStats(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get admin dashboard stats", zap.Error(err))
+		return nil, err
+	}
+	return stats, nil
+}
+
+// GetSystemHealth 获取系统健康状况
+func (s *userService) GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error) {
+	health, err := s.userRepo.GetSystemHealth(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get system health", zap.Error(err))
+		return nil, err
+	}
+	return health, nil
+}
+
 // ListUsers 列出用户
 func (s *userService) ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error) {
-	// TODO: 实现完整的用户列表查询
-	// 这里提供一个简化的示例
-	users := []*models.AdminUserInfo{
-		{
-			ID:            uuid.New(),
-			Email:         "admin@example.com",
-			Username:      "admin",
-			EmailVerified: true,
-			Status:        models.UserStatusActive,
-			DefaultRole:   models.UserRoleAdmin,
-			LoginCount:    100,
-			CreatedAt:     time.Now().Add(-30 * 24 * time.Hour),
-			UpdatedAt:     time.Now(),
-		},
-		{
-			ID:            uuid.New(),
-			Email:         "user@example.com", 
-			Username:      "user1",
-			EmailVerified: true,
-			Status:        models.UserStatusActive,
-			DefaultRole:   models.UserRoleRegular,
-			LoginCount:    20,
-			CreatedAt:     time.Now().Add(-7 * 24 * time.Hour),
-			UpdatedAt:     time.Now(),
-		},
-	}
-
-	totalPages := (int64(len(users)) + int64(query.PerPage) - 1) / int64(query.PerPage)
-	
-	return &models.PaginatedResponse{
-		Data: users,
-		Pagination: &models.Pagination{
-			Page:       query.Page,
-			PageSize:   query.PerPage,
-			Total:      int64(len(users)),
-			TotalPages: int(totalPages),
-		},
-	}, nil
+	return s.userRepo.ListUsers(ctx, query)
 }
 
 // UpdateUserStatus 更新用户状态
@@ -1194,38 +1179,7 @@ func (s *userService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, re
 
 // GetUserLoginLogs 获取用户登录日志
 func (s *userService) GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error) {
-	// TODO: 实现完整的登录日志查询
-	// 这里提供一个简化的示例
-	logs := []models.UserLoginLog{
-		{
-			ID:        uuid.New(),
-			UserID:    uuid.New(),
-			LoginType: models.LoginTypePassword,
-			IPAddress: stringPtr("192.168.1.1"),
-			Success:   true,
-			CreatedAt: time.Now().Add(-1 * time.Hour),
-		},
-		{
-			ID:        uuid.New(),
-			UserID:    uuid.New(),
-			LoginType: models.LoginTypeGoogle,
-			IPAddress: stringPtr("192.168.1.2"),
-			Success:   true,
-			CreatedAt: time.Now().Add(-2 * time.Hour),
-		},
-	}
-
-	totalPages := (int64(len(logs)) + int64(query.PerPage) - 1) / int64(query.PerPage)
-
-	return &models.PaginatedResponse{
-		Data: logs,
-		Pagination: &models.Pagination{
-			Page:       query.Page,
-			PageSize:   query.PerPage,
-			Total:      int64(len(logs)),
-			TotalPages: int(totalPages),
-		},
-	}, nil
+	return s.userRepo.GetUserLoginLogs(ctx, query)
 }
 
 // stringPtr 辅助函数，返回字符串指针

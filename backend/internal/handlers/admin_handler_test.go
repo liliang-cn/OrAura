@@ -99,6 +99,26 @@ func (m *MockAdminService) RevokeRole(ctx context.Context, userID, roleID uuid.U
 	return errors.New("user not found")
 }
 
+func (m *MockAdminService) GetDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error) {
+	return &models.AdminStatsResponse{ // 返回模拟数据
+		TotalUsers:    10,
+		ActiveUsers:   8,
+		MemberUsers:   2,
+		AdminUsers:    1,
+		NewUsersToday: 1,
+		NewUsersWeek:  5,
+		NewUsersMonth: 10,
+	}, nil
+}
+
+func (m *MockAdminService) GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error) {
+	return &models.SystemHealthResponse{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Services:  make(map[string]models.ServiceHealth),
+	}, nil
+}
+
 // 测试辅助方法
 func (m *MockAdminService) AddUser(user *models.User) {
 	m.users[user.ID] = user

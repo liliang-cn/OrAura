@@ -424,11 +424,13 @@ func (suite *UserRepositoryTestSuite) TestLoginLog() {
 	assert.NoError(suite.T(), err)
 	
 	// 获取用户登录日志
-	logs, err := suite.repo.GetUserLoginLogs(ctx, userID, 10)
+	query := &models.LoginLogQuery{UserID: &userID, Page: 1, PerPage: 10}
+	logs, err := suite.repo.GetUserLoginLogs(ctx, query)
 	assert.NoError(suite.T(), err)
-	assert.Len(suite.T(), logs, 1)
-	assert.Equal(suite.T(), loginLog.IPAddress, logs[0].IPAddress)
-	assert.True(suite.T(), logs[0].Success)
+	assert.Len(suite.T(), logs.Data, 1)
+	logData := logs.Data.([]models.UserLoginLog)
+	assert.Equal(suite.T(), loginLog.IPAddress, logData[0].IPAddress)
+	assert.True(suite.T(), logData[0].Success)
 }
 
 // TestUserCounts 测试用户统计

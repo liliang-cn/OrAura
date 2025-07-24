@@ -190,12 +190,12 @@ func (m *MockUserRepository) CreateLoginLog(ctx context.Context, log *models.Use
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) GetUserLoginLogs(ctx context.Context, userID uuid.UUID, limit int) ([]models.UserLoginLog, error) {
-	args := m.Called(ctx, userID, limit)
+func (m *MockUserRepository) GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error) {
+	args := m.Called(ctx, query)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]models.UserLoginLog), args.Error(1)
+	return args.Get(0).(*models.PaginatedResponse), args.Error(1)
 }
 
 // 邮箱验证操作
@@ -341,6 +341,22 @@ func (m *MockUserRepository) CountUsers(ctx context.Context) (int64, error) {
 func (m *MockUserRepository) CountActiveUsers(ctx context.Context, since time.Time) (int64, error) {
 	args := m.Called(ctx, since)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockUserRepository) GetAdminDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.AdminStatsResponse), args.Error(1)
+}
+
+func (m *MockUserRepository) GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SystemHealthResponse), args.Error(1)
 }
 
 // 管理员功能

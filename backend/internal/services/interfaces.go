@@ -27,6 +27,8 @@ type UserManagementService interface {
 
 // AdminService 管理员功能接口 - 只包含管理功能
 type AdminService interface {
+	GetDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error)
+	GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error)
 	ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error)
 	UpdateUserStatus(ctx context.Context, userID uuid.UUID, req *models.UpdateUserStatusRequest) error

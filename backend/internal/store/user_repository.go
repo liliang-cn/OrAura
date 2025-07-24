@@ -20,6 +20,7 @@ type UserRepository interface {
 	GetUserByOAuth(ctx context.Context, provider, subject string) (*models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error)
 	
 	// 用户配置操作
 	CreateUserProfile(ctx context.Context, profile *models.UserProfile) error
@@ -52,7 +53,7 @@ type UserRepository interface {
 	
 	// 登录日志操作
 	CreateLoginLog(ctx context.Context, log *models.UserLoginLog) error
-	GetUserLoginLogs(ctx context.Context, userID uuid.UUID, limit int) ([]models.UserLoginLog, error)
+	GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error)
 	
 	// 邮箱验证操作
 	CreateEmailVerification(ctx context.Context, verification *models.EmailVerification) error
@@ -83,6 +84,8 @@ type UserRepository interface {
 	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]*models.Permission, error)
 	
 	// 统计操作
+	GetAdminDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error)
+	GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountActiveUsers(ctx context.Context, since time.Time) (int64, error)
 }
@@ -160,6 +163,59 @@ func (r *userRepository) UpdateUser(ctx context.Context, user *models.User) erro
 
 func (r *userRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&models.User{}, "id = ?", id).Error
+}
+
+// ListUsers 列出用户
+func (r *userRepository) ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error) {
+	var users []*models.AdminUserInfo
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&models.User{}) 
+
+	// 构建查询
+	if query.Search != "" {
+		search := "%" + query.Search + "%"
+		db = db.Where("username LIKE ? OR email LIKE ?", search, search)
+	}
+	if query.Status != nil {
+		db = db.Where("status = ?", *query.Status)
+	}
+	if query.Role != nil {
+		db = db.Joins("JOIN user_role_assignments ON users.id = user_role_assignments.user_id").
+			Joins("JOIN roles ON user_role_assignments.role_id = roles.id").
+			Where("roles.name = ?", *query.Role)
+	}
+
+	// 计算总数
+	if err := db.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	// 分页和排序
+	db = db.Offset((query.Page - 1) * query.PerPage).Limit(query.PerPage)
+	if query.SortBy != "" {
+		order := "ASC"
+		if query.SortDesc {
+			order = "DESC"
+		}
+		db = db.Order(query.SortBy + " " + order)
+	} else {
+		db = db.Order("created_at DESC")
+	}
+
+	if err := db.Find(&users).Error; err != nil {
+		return nil, err
+	}
+
+	return &models.PaginatedResponse{
+		Data: users,
+		Pagination: &models.Pagination{
+			Page:       query.Page,
+			PageSize:   query.PerPage,
+			Total:      total,
+			TotalPages: (int(total) + query.PerPage - 1) / query.PerPage,
+		},
+	}, nil
 }
 
 // 用户配置操作实现
@@ -274,10 +330,56 @@ func (r *userRepository) CreateLoginLog(ctx context.Context, log *models.UserLog
 	return r.db.WithContext(ctx).Create(log).Error
 }
 
-func (r *userRepository) GetUserLoginLogs(ctx context.Context, userID uuid.UUID, limit int) ([]models.UserLoginLog, error) {
+// GetUserLoginLogs 获取用户登录日志
+func (r *userRepository) GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error) {
 	var logs []models.UserLoginLog
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&logs).Error
-	return logs, err
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&models.UserLoginLog{})
+
+	// 构建查询
+	if query.UserID != nil {
+		db = db.Where("user_id = ?", *query.UserID)
+	}
+	if query.IPAddress != "" {
+		db = db.Where("ip_address = ?", query.IPAddress)
+	}
+	if query.Success != nil {
+		db = db.Where("success = ?", *query.Success)
+	}
+	if query.StartDate != nil {
+		db = db.Where("created_at >= ?", *query.StartDate)
+	}
+	if query.EndDate != nil {
+		db = db.Where("created_at <= ?", *query.EndDate)
+	}
+
+	// 计算总数
+	if err := db.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	// 分页和排序
+	db = db.Offset((query.Page - 1) * query.PerPage).Limit(query.PerPage)
+	order := "ASC"
+	if query.SortDesc {
+		order = "DESC"
+	}
+	db = db.Order("created_at " + order)
+
+	if err := db.Find(&logs).Error; err != nil {
+		return nil, err
+	}
+
+	return &models.PaginatedResponse{
+		Data: logs,
+		Pagination: &models.Pagination{
+			Page:       query.Page,
+			PageSize:   query.PerPage,
+			Total:      total,
+			TotalPages: (int(total) + query.PerPage - 1) / query.PerPage,
+		},
+	}, nil
 }
 
 // 统计操作实现
@@ -297,6 +399,91 @@ func (r *userRepository) CountActiveUsers(ctx context.Context, since time.Time) 
 		Distinct("users.id").
 		Count(&count).Error
 	return count, err
+}
+
+// GetAdminDashboardStats 获取管理员仪表板统计信息
+func (r *userRepository) GetAdminDashboardStats(ctx context.Context) (*models.AdminStatsResponse, error) {
+	var stats models.AdminStatsResponse
+
+	// 获取总用户数
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Count(&stats.TotalUsers).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取活跃用户数（过去30天内登录过的）
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("last_login_at > ?", time.Now().AddDate(0, -1, 0)).Count(&stats.ActiveUsers).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取会员用户数
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("default_role = ?", models.UserRoleMember).Count(&stats.MemberUsers).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取管理员用户数
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("default_role = ?", models.UserRoleAdmin).Count(&stats.AdminUsers).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取今日新增用户
+	today := time.Now().Truncate(24 * time.Hour)
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("created_at >= ?", today).Count(&stats.NewUsersToday).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取本周新增用户
+	startOfWeek := today.AddDate(0, 0, -int(today.Weekday()))
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("created_at >= ?", startOfWeek).Count(&stats.NewUsersWeek).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取本月新增用户
+	startOfMonth := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Where("created_at >= ?", startOfMonth).Count(&stats.NewUsersMonth).Error; err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+// GetSystemHealth 获取系统健康状况
+func (r *userRepository) GetSystemHealth(ctx context.Context) (*models.SystemHealthResponse, error) {
+	health := &models.SystemHealthResponse{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Services:  make(map[string]models.ServiceHealth),
+	}
+
+	// 检查数据库
+	db, err := r.db.DB()
+	if err != nil {
+		health.Status = "unhealthy"
+		health.Services["database"] = models.ServiceHealth{
+			Status:    "unhealthy",
+			Message:   "Failed to get database instance: " + err.Error(),
+			CheckedAt: time.Now(),
+		}
+		return health, nil // 返回部分健康信息
+	}
+
+	if err := db.PingContext(ctx); err != nil {
+		health.Status = "unhealthy"
+		health.Services["database"] = models.ServiceHealth{
+			Status:    "unhealthy",
+			Message:   "Database ping failed: " + err.Error(),
+			CheckedAt: time.Now(),
+		}
+	} else {
+		health.Services["database"] = models.ServiceHealth{
+			Status:    "healthy",
+			Message:   "Database connection is stable",
+			CheckedAt: time.Now(),
+		}
+	}
+
+	// TODO: 检查其他服务，例如 Redis, Email 等
+
+	return health, nil
 }
 
 // 邮箱验证操作实现

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/OrAura/backend/internal/middleware"
 	"github.com/OrAura/backend/internal/models"
@@ -40,15 +39,10 @@ func NewAdminHandler(adminService services.AdminService, validator *validator.Va
 // @Failure 403 {object} models.APIResponse
 // @Router /admin/stats [get]
 func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
-	// TODO: 实现统计信息获取
-	stats := &models.AdminStatsResponse{
-		TotalUsers:    1000,
-		ActiveUsers:   850,
-		MemberUsers:   200,
-		AdminUsers:    5,
-		NewUsersToday: 10,
-		NewUsersWeek:  50,
-		NewUsersMonth: 200,
+	stats, err := h.adminService.GetDashboardStats(c.Request.Context())
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
 	}
 
 	response := models.NewSuccessResponse(stats, "Dashboard stats retrieved successfully")
@@ -307,27 +301,10 @@ func (h *AdminHandler) GetLoginLogs(c *gin.Context) {
 // @Failure 403 {object} models.APIResponse
 // @Router /admin/system/health [get]
 func (h *AdminHandler) GetSystemHealth(c *gin.Context) {
-	// TODO: 实现真实的健康检查
-	health := &models.SystemHealthResponse{
-		Status:    "healthy",
-		Timestamp: time.Now(),
-		Services: map[string]models.ServiceHealth{
-			"database": {
-				Status:    "healthy",
-				Message:   "Database connection is stable",
-				CheckedAt: time.Now(),
-			},
-			"redis": {
-				Status:    "healthy", 
-				Message:   "Redis connection is stable",
-				CheckedAt: time.Now(),
-			},
-			"email": {
-				Status:    "healthy",
-				Message:   "Email service is operational",
-				CheckedAt: time.Now(),
-			},
-		},
+	health, err := h.adminService.GetSystemHealth(c.Request.Context())
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
 	}
 
 	response := models.NewSuccessResponse(health, "System health retrieved successfully")

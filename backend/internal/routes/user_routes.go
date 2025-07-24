@@ -73,11 +73,18 @@ func SetupUserRoutes(r *gin.RouterGroup, userHandler *handlers.UserHandler, auth
 	authenticated.Use(authMiddleware.RequireAuth())
 	authenticated.Use(rateLimitMiddleware.UserRateLimit())
 	{
-		// 用户注销
-		authenticated.POST("/auth/logout", userHandler.Logout)
+		// 认证管理
+		auth := authenticated.Group("/auth")
+		{
+			// 用户注销
+			auth.POST("/logout", userHandler.Logout)
+			
+			// 注销所有会话
+			auth.POST("/logout/all", userHandler.LogoutAll)
+		}
 		
 		// 用户信息管理
-		users := authenticated.Group("/users")
+		users := authenticated.Group("/user")
 		{
 			// 获取用户信息
 			users.GET("/profile", userHandler.GetProfile)
@@ -93,6 +100,41 @@ func SetupUserRoutes(r *gin.RouterGroup, userHandler *handlers.UserHandler, auth
 			
 			// 删除账户
 			users.DELETE("/account", userHandler.DeleteAccount)
+			
+			// 会话管理
+			users.GET("/sessions", userHandler.GetUserSessions)
+			users.DELETE("/sessions/:session_id", userHandler.DeleteUserSession)
+			
+			// API令牌管理
+			users.GET("/api-tokens", userHandler.ListAPITokens)
+			users.POST("/api-tokens", userHandler.CreateAPIToken)
+			users.DELETE("/api-tokens/:token_id", userHandler.DeleteAPIToken)
+			
+			// 会员专属功能示例
+			premium := users.Group("/premium")
+			premium.Use(authMiddleware.RequireMember()) // 需要会员权限
+			{
+				// premium.GET("/features", premiumHandler.GetFeatures)
+				// premium.GET("/exclusive-content", premiumHandler.GetExclusiveContent)
+			}
 		}
+		
+		// 内容管理示例（注释掉未实现的部分）
+		/*
+		content := authenticated.Group("/content")
+		{
+			// 查看内容（所有用户）
+			// content.GET("", contentHandler.ListContent)
+			
+			// 创建内容（需要相应权限）
+			// content.POST("", authMiddleware.RequirePermission("content", "create"), contentHandler.CreateContent)
+			
+			// 更新内容（需要相应权限）
+			// content.PUT("/:id", authMiddleware.RequirePermission("content", "update"), contentHandler.UpdateContent)
+			
+			// 删除内容（需要相应权限）
+			// content.DELETE("/:id", authMiddleware.RequirePermission("content", "delete"), contentHandler.DeleteContent)
+		}
+		*/
 	}
 }

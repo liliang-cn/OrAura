@@ -24,6 +24,615 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/logs/login": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员查看系统登录日志",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "获取登录日志",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "ip_address",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "per_page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "sort_desc",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "success",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "user_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.PaginatedResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取用户数量、活跃用户等统计信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "获取管理员仪表板统计信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.AdminStatsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/system/health": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "检查系统各组件的健康状态",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "系统健康检查",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.SystemHealthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员查看所有用户列表，支持筛选和分页",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "获取用户列表",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "name": "per_page",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "regular",
+                            "member",
+                            "admin",
+                            "super_admin"
+                        ],
+                        "type": "string",
+                        "x-enum-comments": {
+                            "UserRoleAdmin": "管理员",
+                            "UserRoleMember": "会员用户",
+                            "UserRoleRegular": "普通用户",
+                            "UserRoleSuperAdmin": "超级管理员"
+                        },
+                        "x-enum-descriptions": [
+                            "普通用户",
+                            "会员用户",
+                            "管理员",
+                            "超级管理员"
+                        ],
+                        "x-enum-varnames": [
+                            "UserRoleRegular",
+                            "UserRoleMember",
+                            "UserRoleAdmin",
+                            "UserRoleSuperAdmin"
+                        ],
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "maxLength": 100,
+                        "type": "string",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "created_at",
+                            "updated_at",
+                            "login_count",
+                            "last_login_at"
+                        ],
+                        "type": "string",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "name": "sort_desc",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "suspended",
+                            "deleted"
+                        ],
+                        "type": "string",
+                        "x-enum-varnames": [
+                            "UserStatusActive",
+                            "UserStatusSuspended",
+                            "UserStatusDeleted"
+                        ],
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.PaginatedResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{user_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员查看用户详细信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "获取用户详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.AdminUserInfo"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{user_id}/roles": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员为用户分配角色",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "分配角色给用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "角色分配请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AssignRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{user_id}/roles/{role_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员撤销用户的角色",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "撤销用户角色",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "角色ID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{user_id}/status": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员更新用户状态（激活/暂停/删除）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "管理员"
+                ],
+                "summary": "更新用户状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "状态更新请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateUserStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/forgot-password": {
             "post": {
                 "description": "发送密码重置邮件",
@@ -137,6 +746,37 @@ const docTemplate = `{
                     "认证"
                 ],
                 "summary": "用户注销",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout/all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "登出用户的所有会话",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "认证"
+                ],
+                "summary": "登出所有会话",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -499,6 +1139,251 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/api-tokens": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取当前用户的所有API令牌",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API令牌"
+                ],
+                "summary": "列出API令牌",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.APIToken"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "为当前用户创建新的API令牌",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API令牌"
+                ],
+                "summary": "创建API令牌",
+                "parameters": [
+                    {
+                        "description": "API令牌创建请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateAPITokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.APITokenResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/api-tokens/{token_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除指定的API令牌",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API令牌"
+                ],
+                "summary": "删除API令牌",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "令牌ID",
+                        "name": "token_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取当前用户的所有活跃会话",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "获取用户会话",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.UserSession"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/sessions/{session_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除指定的用户会话",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "删除用户会话",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "会话ID",
+                        "name": "session_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/users/account": {
             "delete": {
                 "security": [
@@ -797,6 +1682,220 @@ const docTemplate = `{
                 }
             }
         },
+        "models.APIToken": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "description": "过期时间",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "description": "令牌名称",
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "令牌权限",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.APITokenPermissions"
+                        }
+                    ]
+                },
+                "token_prefix": {
+                    "description": "令牌前缀（显示用）",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.APITokenInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "$ref": "#/definitions/models.APITokenPermissions"
+                },
+                "token_prefix": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.APITokenPermissions": {
+            "type": "object",
+            "properties": {
+                "ip_whitelist": {
+                    "description": "IP白名单",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rate_limit": {
+                    "description": "速率限制",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.TokenRateLimit"
+                        }
+                    ]
+                },
+                "resources": {
+                    "description": "可访问资源",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "restrictions": {
+                    "description": "其他限制",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.TokenRestrictions"
+                        }
+                    ]
+                },
+                "scopes": {
+                    "description": "权限范围",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "models.APITokenResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "description": "完整令牌，只在创建时返回",
+                    "type": "string"
+                },
+                "token_info": {
+                    "$ref": "#/definitions/models.APITokenInfo"
+                }
+            }
+        },
+        "models.AdminStatsResponse": {
+            "type": "object",
+            "properties": {
+                "active_users": {
+                    "type": "integer"
+                },
+                "admin_users": {
+                    "type": "integer"
+                },
+                "member_users": {
+                    "type": "integer"
+                },
+                "new_users_month": {
+                    "type": "integer"
+                },
+                "new_users_today": {
+                    "type": "integer"
+                },
+                "new_users_week": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.AdminUserInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_role": {
+                    "$ref": "#/definitions/models.UserRole"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "email_verified": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "login_count": {
+                    "type": "integer"
+                },
+                "membership_expiry": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RoleInfo"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/models.UserStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AssignRoleRequest": {
+            "type": "object",
+            "required": [
+                "role_id",
+                "user_id"
+            ],
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "models.AvatarUploadResponse": {
             "type": "object",
             "properties": {
@@ -826,6 +1925,26 @@ const docTemplate = `{
                 }
             }
         },
+        "models.CreateAPITokenRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "permissions"
+            ],
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "My API Token"
+                },
+                "permissions": {
+                    "$ref": "#/definitions/models.APITokenPermissions"
+                }
+            }
+        },
         "models.DeleteAccountRequest": {
             "type": "object",
             "required": [
@@ -837,6 +1956,31 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DeviceInfo": {
+            "type": "object",
+            "properties": {
+                "app_version": {
+                    "description": "1.0.0",
+                    "type": "string"
+                },
+                "device_id": {
+                    "description": "设备唯一标识",
+                    "type": "string"
+                },
+                "device_model": {
+                    "description": "iPhone 13, Pixel 6, etc",
+                    "type": "string"
+                },
+                "os_version": {
+                    "description": "iOS 15.0, Android 12, etc",
+                    "type": "string"
+                },
+                "platform": {
+                    "description": "ios, android, web",
                     "type": "string"
                 }
             }
@@ -861,6 +2005,26 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Location": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "lat": {
+                    "type": "number"
+                },
+                "lon": {
+                    "type": "number"
+                },
+                "region": {
                     "type": "string"
                 }
             }
@@ -930,6 +2094,32 @@ const docTemplate = `{
                 },
                 "name": {
                     "$ref": "#/definitions/models.OAuthName"
+                }
+            }
+        },
+        "models.PaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "pagination": {
+                    "$ref": "#/definitions/models.Pagination"
+                }
+            }
+        },
+        "models.Pagination": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
                 }
             }
         },
@@ -1005,6 +2195,74 @@ const docTemplate = `{
                 }
             }
         },
+        "models.RoleInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "name": {
+                    "$ref": "#/definitions/models.UserRole"
+                }
+            }
+        },
+        "models.ServiceHealth": {
+            "type": "object",
+            "properties": {
+                "checked_at": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SystemHealthResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/models.ServiceHealth"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.TokenRateLimit": {
+            "type": "object",
+            "properties": {
+                "requests_per_day": {
+                    "type": "integer"
+                },
+                "requests_per_hour": {
+                    "type": "integer"
+                },
+                "requests_per_minute": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.TokenResponse": {
             "type": "object",
             "properties": {
@@ -1025,6 +2283,29 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/models.UserInfo"
+                }
+            }
+        },
+        "models.TokenRestrictions": {
+            "type": "object",
+            "properties": {
+                "allowed_methods": {
+                    "description": "允许的HTTP方法",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowed_paths": {
+                    "description": "允许的路径模式",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "read_only": {
+                    "description": "只读权限",
+                    "type": "boolean"
                 }
             }
         },
@@ -1049,6 +2330,30 @@ const docTemplate = `{
                 }
             }
         },
+        "models.UpdateUserStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "status": {
+                    "enum": [
+                        "active",
+                        "suspended",
+                        "deleted"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.UserStatus"
+                        }
+                    ]
+                }
+            }
+        },
         "models.UserInfo": {
             "type": "object",
             "properties": {
@@ -1058,11 +2363,31 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "current_role": {
+                    "$ref": "#/definitions/models.UserRole"
+                },
+                "default_role": {
+                    "description": "新增角色相关字段",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.UserRole"
+                        }
+                    ]
+                },
                 "email": {
                     "type": "string"
                 },
                 "email_verified": {
                     "type": "boolean"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "login_count": {
+                    "type": "integer"
+                },
+                "membership_expiry": {
+                    "type": "string"
                 },
                 "nickname": {
                     "type": "string"
@@ -1072,6 +2397,12 @@ const docTemplate = `{
                 },
                 "preferences": {
                     "$ref": "#/definitions/models.UserPreferences"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RoleInfo"
+                    }
                 },
                 "timezone": {
                     "type": "string"
@@ -1100,6 +2431,84 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "models.UserRole": {
+            "type": "string",
+            "enum": [
+                "regular",
+                "member",
+                "admin",
+                "super_admin"
+            ],
+            "x-enum-comments": {
+                "UserRoleAdmin": "管理员",
+                "UserRoleMember": "会员用户",
+                "UserRoleRegular": "普通用户",
+                "UserRoleSuperAdmin": "超级管理员"
+            },
+            "x-enum-descriptions": [
+                "普通用户",
+                "会员用户",
+                "管理员",
+                "超级管理员"
+            ],
+            "x-enum-varnames": [
+                "UserRoleRegular",
+                "UserRoleMember",
+                "UserRoleAdmin",
+                "UserRoleSuperAdmin"
+            ]
+        },
+        "models.UserSession": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "device_info": {
+                    "$ref": "#/definitions/models.DeviceInfo"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_activity": {
+                    "type": "string"
+                },
+                "location": {
+                    "$ref": "#/definitions/models.Location"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UserStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "suspended",
+                "deleted"
+            ],
+            "x-enum-varnames": [
+                "UserStatusActive",
+                "UserStatusSuspended",
+                "UserStatusDeleted"
+            ]
         },
         "models.VerifyEmailRequest": {
             "type": "object",

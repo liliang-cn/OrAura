@@ -16,6 +16,145 @@ definitions:
         description: 消息
         type: string
     type: object
+  models.APIToken:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        description: 过期时间
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_used_at:
+        type: string
+      name:
+        description: 令牌名称
+        type: string
+      permissions:
+        allOf:
+        - $ref: '#/definitions/models.APITokenPermissions'
+        description: 令牌权限
+      token_prefix:
+        description: 令牌前缀（显示用）
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.APITokenInfo:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_used_at:
+        type: string
+      name:
+        type: string
+      permissions:
+        $ref: '#/definitions/models.APITokenPermissions'
+      token_prefix:
+        type: string
+    type: object
+  models.APITokenPermissions:
+    properties:
+      ip_whitelist:
+        description: IP白名单
+        items:
+          type: string
+        type: array
+      rate_limit:
+        allOf:
+        - $ref: '#/definitions/models.TokenRateLimit'
+        description: 速率限制
+      resources:
+        description: 可访问资源
+        items:
+          type: string
+        type: array
+      restrictions:
+        allOf:
+        - $ref: '#/definitions/models.TokenRestrictions'
+        description: 其他限制
+      scopes:
+        description: 权限范围
+        items:
+          type: string
+        type: array
+    type: object
+  models.APITokenResponse:
+    properties:
+      token:
+        description: 完整令牌，只在创建时返回
+        type: string
+      token_info:
+        $ref: '#/definitions/models.APITokenInfo'
+    type: object
+  models.AdminStatsResponse:
+    properties:
+      active_users:
+        type: integer
+      admin_users:
+        type: integer
+      member_users:
+        type: integer
+      new_users_month:
+        type: integer
+      new_users_today:
+        type: integer
+      new_users_week:
+        type: integer
+      total_users:
+        type: integer
+    type: object
+  models.AdminUserInfo:
+    properties:
+      created_at:
+        type: string
+      default_role:
+        $ref: '#/definitions/models.UserRole'
+      email:
+        type: string
+      email_verified:
+        type: boolean
+      id:
+        type: string
+      last_login_at:
+        type: string
+      login_count:
+        type: integer
+      membership_expiry:
+        type: string
+      roles:
+        items:
+          $ref: '#/definitions/models.RoleInfo'
+        type: array
+      status:
+        $ref: '#/definitions/models.UserStatus'
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  models.AssignRoleRequest:
+    properties:
+      expires_at:
+        type: string
+      role_id:
+        type: string
+      user_id:
+        type: string
+    required:
+    - role_id
+    - user_id
+    type: object
   models.AvatarUploadResponse:
     properties:
       avatar_url:
@@ -36,6 +175,20 @@ definitions:
     - current_password
     - new_password
     type: object
+  models.CreateAPITokenRequest:
+    properties:
+      expires_at:
+        type: string
+      name:
+        example: My API Token
+        maxLength: 100
+        type: string
+      permissions:
+        $ref: '#/definitions/models.APITokenPermissions'
+    required:
+    - name
+    - permissions
+    type: object
   models.DeleteAccountRequest:
     properties:
       confirmation:
@@ -45,6 +198,24 @@ definitions:
     required:
     - confirmation
     - password
+    type: object
+  models.DeviceInfo:
+    properties:
+      app_version:
+        description: 1.0.0
+        type: string
+      device_id:
+        description: 设备唯一标识
+        type: string
+      device_model:
+        description: iPhone 13, Pixel 6, etc
+        type: string
+      os_version:
+        description: iOS 15.0, Android 12, etc
+        type: string
+      platform:
+        description: ios, android, web
+        type: string
     type: object
   models.FieldError:
     properties:
@@ -61,6 +232,19 @@ definitions:
         type: string
     required:
     - email
+    type: object
+  models.Location:
+    properties:
+      city:
+        type: string
+      country:
+        type: string
+      lat:
+        type: number
+      lon:
+        type: number
+      region:
+        type: string
     type: object
   models.LoginRequest:
     properties:
@@ -105,6 +289,23 @@ definitions:
         type: string
       name:
         $ref: '#/definitions/models.OAuthName'
+    type: object
+  models.PaginatedResponse:
+    properties:
+      data: {}
+      pagination:
+        $ref: '#/definitions/models.Pagination'
+    type: object
+  models.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
     type: object
   models.RefreshTokenRequest:
     properties:
@@ -157,6 +358,50 @@ definitions:
     - new_password
     - token
     type: object
+  models.RoleInfo:
+    properties:
+      description:
+        type: string
+      display_name:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      level:
+        type: integer
+      name:
+        $ref: '#/definitions/models.UserRole'
+    type: object
+  models.ServiceHealth:
+    properties:
+      checked_at:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+  models.SystemHealthResponse:
+    properties:
+      services:
+        additionalProperties:
+          $ref: '#/definitions/models.ServiceHealth'
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  models.TokenRateLimit:
+    properties:
+      requests_per_day:
+        type: integer
+      requests_per_hour:
+        type: integer
+      requests_per_minute:
+        type: integer
+    type: object
   models.TokenResponse:
     properties:
       access_token:
@@ -171,6 +416,22 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/models.UserInfo'
+    type: object
+  models.TokenRestrictions:
+    properties:
+      allowed_methods:
+        description: 允许的HTTP方法
+        items:
+          type: string
+        type: array
+      allowed_paths:
+        description: 允许的路径模式
+        items:
+          type: string
+        type: array
+      read_only:
+        description: 只读权限
+        type: boolean
     type: object
   models.UpdateProfileRequest:
     properties:
@@ -187,22 +448,53 @@ definitions:
         minLength: 3
         type: string
     type: object
+  models.UpdateUserStatusRequest:
+    properties:
+      reason:
+        maxLength: 255
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.UserStatus'
+        enum:
+        - active
+        - suspended
+        - deleted
+    required:
+    - status
+    type: object
   models.UserInfo:
     properties:
       avatar_url:
         type: string
       created_at:
         type: string
+      current_role:
+        $ref: '#/definitions/models.UserRole'
+      default_role:
+        allOf:
+        - $ref: '#/definitions/models.UserRole'
+        description: 新增角色相关字段
       email:
         type: string
       email_verified:
         type: boolean
+      last_login_at:
+        type: string
+      login_count:
+        type: integer
+      membership_expiry:
+        type: string
       nickname:
         type: string
       oauth_provider:
         type: string
       preferences:
         $ref: '#/definitions/models.UserPreferences'
+      roles:
+        items:
+          $ref: '#/definitions/models.RoleInfo'
+        type: array
       timezone:
         type: string
       updated_at:
@@ -221,6 +513,63 @@ definitions:
       theme:
         type: string
     type: object
+  models.UserRole:
+    enum:
+    - regular
+    - member
+    - admin
+    - super_admin
+    type: string
+    x-enum-comments:
+      UserRoleAdmin: 管理员
+      UserRoleMember: 会员用户
+      UserRoleRegular: 普通用户
+      UserRoleSuperAdmin: 超级管理员
+    x-enum-descriptions:
+    - 普通用户
+    - 会员用户
+    - 管理员
+    - 超级管理员
+    x-enum-varnames:
+    - UserRoleRegular
+    - UserRoleMember
+    - UserRoleAdmin
+    - UserRoleSuperAdmin
+  models.UserSession:
+    properties:
+      created_at:
+        type: string
+      device_info:
+        $ref: '#/definitions/models.DeviceInfo'
+      expires_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      is_active:
+        type: boolean
+      last_activity:
+        type: string
+      location:
+        $ref: '#/definitions/models.Location'
+      updated_at:
+        type: string
+      user_agent:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.UserStatus:
+    enum:
+    - active
+    - suspended
+    - deleted
+    type: string
+    x-enum-varnames:
+    - UserStatusActive
+    - UserStatusSuspended
+    - UserStatusDeleted
   models.VerifyEmailRequest:
     properties:
       token:
@@ -242,6 +591,387 @@ info:
   title: OrAura Backend API
   version: "1.0"
 paths:
+  /admin/logs/login:
+    get:
+      description: 管理员查看系统登录日志
+      parameters:
+      - in: query
+        name: end_date
+        type: string
+      - in: query
+        name: ip_address
+        type: string
+      - in: query
+        minimum: 1
+        name: page
+        type: integer
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - in: query
+        name: sort_desc
+        type: boolean
+      - in: query
+        name: start_date
+        type: string
+      - in: query
+        name: success
+        type: boolean
+      - in: query
+        name: user_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.PaginatedResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取登录日志
+      tags:
+      - 管理员
+  /admin/stats:
+    get:
+      description: 获取用户数量、活跃用户等统计信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AdminStatsResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取管理员仪表板统计信息
+      tags:
+      - 管理员
+  /admin/system/health:
+    get:
+      description: 检查系统各组件的健康状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.SystemHealthResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 系统健康检查
+      tags:
+      - 管理员
+  /admin/users:
+    get:
+      description: 管理员查看所有用户列表，支持筛选和分页
+      parameters:
+      - in: query
+        minimum: 1
+        name: page
+        type: integer
+      - in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - enum:
+        - regular
+        - member
+        - admin
+        - super_admin
+        in: query
+        name: role
+        type: string
+        x-enum-comments:
+          UserRoleAdmin: 管理员
+          UserRoleMember: 会员用户
+          UserRoleRegular: 普通用户
+          UserRoleSuperAdmin: 超级管理员
+        x-enum-descriptions:
+        - 普通用户
+        - 会员用户
+        - 管理员
+        - 超级管理员
+        x-enum-varnames:
+        - UserRoleRegular
+        - UserRoleMember
+        - UserRoleAdmin
+        - UserRoleSuperAdmin
+      - in: query
+        maxLength: 100
+        name: search
+        type: string
+      - enum:
+        - created_at
+        - updated_at
+        - login_count
+        - last_login_at
+        in: query
+        name: sort_by
+        type: string
+      - in: query
+        name: sort_desc
+        type: boolean
+      - enum:
+        - active
+        - suspended
+        - deleted
+        in: query
+        name: status
+        type: string
+        x-enum-varnames:
+        - UserStatusActive
+        - UserStatusSuspended
+        - UserStatusDeleted
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.PaginatedResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户列表
+      tags:
+      - 管理员
+  /admin/users/{user_id}:
+    get:
+      description: 管理员查看用户详细信息
+      parameters:
+      - description: 用户ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AdminUserInfo'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户详情
+      tags:
+      - 管理员
+  /admin/users/{user_id}/roles:
+    post:
+      consumes:
+      - application/json
+      description: 管理员为用户分配角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: 角色分配请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AssignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 分配角色给用户
+      tags:
+      - 管理员
+  /admin/users/{user_id}/roles/{role_id}:
+    delete:
+      description: 管理员撤销用户的角色
+      parameters:
+      - description: 用户ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: role_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 撤销用户角色
+      tags:
+      - 管理员
+  /admin/users/{user_id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 管理员更新用户状态（激活/暂停/删除）
+      parameters:
+      - description: 用户ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: 状态更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新用户状态
+      tags:
+      - 管理员
   /auth/forgot-password:
     post:
       consumes:
@@ -320,6 +1050,25 @@ paths:
       security:
       - BearerAuth: []
       summary: 用户注销
+      tags:
+      - 认证
+  /auth/logout/all:
+    post:
+      description: 登出用户的所有会话
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 登出所有会话
       tags:
       - 认证
   /auth/oauth/apple:
@@ -533,6 +1282,152 @@ paths:
       summary: 验证邮箱
       tags:
       - 认证
+  /user/api-tokens:
+    get:
+      description: 获取当前用户的所有API令牌
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.APIToken'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 列出API令牌
+      tags:
+      - API令牌
+    post:
+      consumes:
+      - application/json
+      description: 为当前用户创建新的API令牌
+      parameters:
+      - description: API令牌创建请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateAPITokenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.APITokenResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建API令牌
+      tags:
+      - API令牌
+  /user/api-tokens/{token_id}:
+    delete:
+      description: 删除指定的API令牌
+      parameters:
+      - description: 令牌ID
+        in: path
+        name: token_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除API令牌
+      tags:
+      - API令牌
+  /user/sessions:
+    get:
+      description: 获取当前用户的所有活跃会话
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.UserSession'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取用户会话
+      tags:
+      - 用户
+  /user/sessions/{session_id}:
+    delete:
+      description: 删除指定的用户会话
+      parameters:
+      - description: 会话ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: 删除用户会话
+      tags:
+      - 用户
   /users/account:
     delete:
       consumes:

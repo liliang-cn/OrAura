@@ -18,6 +18,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -76,9 +77,26 @@ func main() {
 		&models.PasswordResetToken{},
 		&models.UserLoginLog{},
 		&models.EmailVerification{},
+		// 新增角色相关表
+		&models.Role{},
+		&models.Permission{},
+		&models.RolePermission{},
+		&models.UserRoleAssignment{},
+		&models.APIToken{},
+		&models.UserSession{},
 	)
 	if err != nil {
 		zapLogger.Fatal("cannot migrate database", zap.Error(err))
+	}
+
+	// 初始化默认角色和权限
+	if err := initializeRolesAndPermissions(db, zapLogger); err != nil {
+		zapLogger.Fatal("cannot initialize roles and permissions", zap.Error(err))
+	}
+
+	// 创建超级管理员（如果不存在）
+	if err := initializeSuperAdmin(db, cfg, zapLogger); err != nil {
+		zapLogger.Fatal("cannot initialize super admin", zap.Error(err))
 	}
 
 	// 初始化 JWT 管理器
@@ -113,6 +131,7 @@ func main() {
 
 	// 初始化处理器
 	userHandler := handlers.NewUserHandler(userService, validate, zapLogger)
+	adminHandler := handlers.NewAdminHandler(userService, validate, zapLogger)
 
 	// 初始化中间件
 	authMiddleware := middleware.NewAuthMiddleware(userService, zapLogger)
@@ -144,6 +163,7 @@ func main() {
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
 	routes.SetupUserRoutes(apiV1, userHandler, authMiddleware, rateLimitMiddleware)
+	routes.SetupAdminRoutes(apiV1, adminHandler, authMiddleware, rateLimitMiddleware)
 
 	// Swagger 文档路由
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -158,4 +178,146 @@ func main() {
 	if err := r.Run(serverAddr); err != nil {
 		zapLogger.Fatal("cannot start server", zap.Error(err))
 	}
+}
+
+// initializeRolesAndPermissions 初始化默认角色和权限
+func initializeRolesAndPermissions(db *gorm.DB, logger *zap.Logger) error {
+	// 创建默认角色
+	defaultRoles := []models.Role{
+		{
+			Name:        models.UserRoleRegular,
+			DisplayName: "Regular User",
+			Description: "普通用户",
+			Level:       0,
+			IsSystem:    true,
+			IsActive:    true,
+		},
+		{
+			Name:        models.UserRoleMember,
+			DisplayName: "Member",
+			Description: "会员用户",
+			Level:       1,
+			IsSystem:    true,
+			IsActive:    true,
+		},
+		{
+			Name:        models.UserRoleAdmin,
+			DisplayName: "Administrator",
+			Description: "管理员",
+			Level:       2,
+			IsSystem:    true,
+			IsActive:    true,
+		},
+		{
+			Name:        models.UserRoleSuperAdmin,
+			DisplayName: "Super Administrator",
+			Description: "超级管理员",
+			Level:       3,
+			IsSystem:    true,
+			IsActive:    true,
+		},
+	}
+
+	for _, role := range defaultRoles {
+		var existingRole models.Role
+		if err := db.Where("name = ?", role.Name).First(&existingRole).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err := db.Create(&role).Error; err != nil {
+					return err
+				}
+				logger.Info("Created default role", zap.String("role", string(role.Name)))
+			} else {
+				return err
+			}
+		}
+	}
+
+	// 创建基础权限
+	defaultPermissions := []models.Permission{
+		{Name: "user.read", Description: "读取用户信息", Resource: "user", Action: "read"},
+		{Name: "user.write", Description: "修改用户信息", Resource: "user", Action: "write"},
+		{Name: "admin.users.read", Description: "管理员查看用户", Resource: "admin.users", Action: "read"},
+		{Name: "admin.users.write", Description: "管理员管理用户", Resource: "admin.users", Action: "write"},
+		{Name: "admin.roles.read", Description: "管理员查看角色", Resource: "admin.roles", Action: "read"},
+		{Name: "admin.roles.write", Description: "管理员管理角色", Resource: "admin.roles", Action: "write"},
+		{Name: "super.admin", Description: "超级管理员权限", Resource: "super", Action: "admin"},
+	}
+
+	for _, permission := range defaultPermissions {
+		var existingPermission models.Permission
+		if err := db.Where("name = ?", permission.Name).First(&existingPermission).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				if err := db.Create(&permission).Error; err != nil {
+					return err
+				}
+				logger.Info("Created default permission", zap.String("permission", permission.Name))
+			} else {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeSuperAdmin 初始化超级管理员
+func initializeSuperAdmin(db *gorm.DB, cfg *config.Config, logger *zap.Logger) error {
+	// 检查是否已存在超级管理员
+	var superAdminCount int64
+	if err := db.Model(&models.User{}).Where("default_role = ?", models.UserRoleSuperAdmin).Count(&superAdminCount).Error; err != nil {
+		return err
+	}
+
+	if superAdminCount > 0 {
+		logger.Info("Super admin already exists")
+		return nil
+	}
+
+	// 从配置读取超级管理员信息
+	adminEmail := cfg.SuperAdmin.Email
+	adminUsername := cfg.SuperAdmin.Username
+	adminPassword := cfg.SuperAdmin.Password
+
+	// 创建超级管理员用户
+	hashedPassword, err := utils.HashPassword(adminPassword)
+	if err != nil {
+		return err
+	}
+
+	superAdmin := &models.User{
+		Email:         adminEmail,
+		Username:      adminUsername,
+		PasswordHash:  &hashedPassword,
+		EmailVerified: true,
+		Status:        models.UserStatusActive,
+		DefaultRole:   models.UserRoleSuperAdmin,
+	}
+
+	if err := db.Create(superAdmin).Error; err != nil {
+		return err
+	}
+
+	// 创建用户配置
+	profile := &models.UserProfile{
+		UserID:   superAdmin.ID,
+		Timezone: "UTC",
+		Preferences: models.UserPreferences{
+			Language: "en-US",
+			Theme:    "light",
+			Notifications: models.NotificationSettings{
+				Email: true,
+				Push:  true,
+			},
+		},
+	}
+
+	if err := db.Create(profile).Error; err != nil {
+		return err
+	}
+
+	logger.Info("Super admin created successfully", 
+		zap.String("email", adminEmail),
+		zap.String("username", adminUsername))
+
+	return nil
 }

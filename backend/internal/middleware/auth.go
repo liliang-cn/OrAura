@@ -128,6 +128,120 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 	}
 }
 
+// RequireRole 需要特定角色的中间件
+func (m *AuthMiddleware) RequireRole(roles ...models.UserRole) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := GetUserFromGin(c)
+		if !exists {
+			m.respondWithError(c, http.StatusUnauthorized, 40101, "Authentication required")
+			return
+		}
+
+		// 检查用户是否有任一所需角色
+		userHighestRole := user.GetHighestRole()
+		for _, requiredRole := range roles {
+			if user.HasRole(requiredRole) || userHighestRole == requiredRole {
+				c.Next()
+				return
+			}
+		}
+
+		m.logger.Warn("User lacks required role", 
+			zap.String("user_id", user.ID.String()),
+			zap.String("user_role", string(userHighestRole)),
+			zap.Any("required_roles", roles),
+		)
+		m.respondWithError(c, http.StatusForbidden, 40301, "Insufficient permissions")
+	}
+}
+
+// RequirePermission 需要特定权限的中间件
+func (m *AuthMiddleware) RequirePermission(resource, action string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := GetUserFromGin(c)
+		if !exists {
+			m.respondWithError(c, http.StatusUnauthorized, 40101, "Authentication required")
+			return
+		}
+
+		// 检查用户是否有所需权限
+		hasPermission, err := m.userService.HasPermission(c.Request.Context(), user.ID, resource, action)
+		if err != nil {
+			m.logger.Error("Failed to check user permission", 
+				zap.Error(err),
+				zap.String("user_id", user.ID.String()),
+				zap.String("resource", resource),
+				zap.String("action", action),
+			)
+			m.respondWithError(c, http.StatusInternalServerError, 50001, "Internal server error")
+			return
+		}
+
+		if !hasPermission {
+			m.logger.Warn("User lacks required permission", 
+				zap.String("user_id", user.ID.String()),
+				zap.String("resource", resource),
+				zap.String("action", action),
+			)
+			m.respondWithError(c, http.StatusForbidden, 40301, "Insufficient permissions")
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireAdmin 需要管理员权限的中间件
+func (m *AuthMiddleware) RequireAdmin() gin.HandlerFunc {
+	return m.RequireRole(models.UserRoleAdmin, models.UserRoleSuperAdmin)
+}
+
+// RequireSuperAdmin 需要超级管理员权限的中间件
+func (m *AuthMiddleware) RequireSuperAdmin() gin.HandlerFunc {
+	return m.RequireRole(models.UserRoleSuperAdmin)
+}
+
+// RequireMember 需要会员权限的中间件
+func (m *AuthMiddleware) RequireMember() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := GetUserFromGin(c)
+		if !exists {
+			m.respondWithError(c, http.StatusUnauthorized, 40101, "Authentication required")
+			return
+		}
+
+		// 检查用户是否是会员或更高级别
+		userRole := user.GetHighestRole()
+		if userRole == models.UserRoleRegular {
+			// 还可以检查会员是否过期
+			if !user.IsMembershipActive() {
+				m.respondWithError(c, http.StatusForbidden, 40302, "Membership required")
+				return
+			}
+		}
+
+		c.Next()
+	}
+}
+
+// RequireActiveUser 需要活跃用户的中间件（排除暂停账户）
+func (m *AuthMiddleware) RequireActiveUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, exists := GetUserFromGin(c)
+		if !exists {
+			m.respondWithError(c, http.StatusUnauthorized, 40101, "Authentication required")
+			return
+		}
+
+		if !user.IsActive() {
+			m.respondWithError(c, http.StatusForbidden, 40303, "Account suspended")
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // GetUserFromContext 从上下文中获取用户信息
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	user, ok := ctx.Value(UserKey).(*models.User)

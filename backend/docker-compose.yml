@@ -1,8 +1,8 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: m.daocloud.io/docker.io/library/postgres:15-alpine
     container_name: oraura-postgres
     environment:
       POSTGRES_DB: oraura_db
@@ -19,7 +19,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: m.daocloud.io/docker.io/library/redis:7-alpine
     container_name: oraura-redis
     ports:
       - "6379:6379"

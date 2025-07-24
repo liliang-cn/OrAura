@@ -38,6 +38,7 @@ type UserService interface {
 	Login(ctx context.Context, req *models.LoginRequest) (*models.TokenResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*models.TokenResponse, error)
 	Logout(ctx context.Context, userID uuid.UUID, accessToken string) error
+	LogoutAll(ctx context.Context, userID uuid.UUID) error
 	
 	// OAuth 相关
 	LoginWithGoogle(ctx context.Context, req *models.OAuthLoginRequest) (*models.TokenResponse, error)
@@ -50,6 +51,8 @@ type UserService interface {
 	// 用户信息管理
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*models.UserInfo, error)
 	UpdateUserProfile(ctx context.Context, userID uuid.UUID, req *models.UpdateProfileRequest) (*models.UserInfo, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	
 	// 密码管理
 	ChangePassword(ctx context.Context, userID uuid.UUID, req *models.ChangePasswordRequest) error
@@ -59,8 +62,33 @@ type UserService interface {
 	// 账户管理
 	DeleteAccount(ctx context.Context, userID uuid.UUID, req *models.DeleteAccountRequest) error
 	
-	// 工具方法
+	// 令牌管理
 	ValidateAccessToken(ctx context.Context, tokenString string) (*models.User, error)
+	IsTokenBlacklisted(ctx context.Context, token string) (bool, error)
+	BlacklistToken(ctx context.Context, token string, userID uuid.UUID, expiresAt time.Time) error
+	
+	// API令牌管理
+	CreateAPIToken(ctx context.Context, userID uuid.UUID, req *models.CreateAPITokenRequest) (*models.APITokenResponse, error)
+	ValidateAPIToken(ctx context.Context, token string) (*models.APIToken, error)
+	ListAPITokens(ctx context.Context, userID uuid.UUID) ([]*models.APIToken, error)
+	UpdateAPIToken(ctx context.Context, tokenID uuid.UUID, req *models.UpdateAPITokenRequest) (*models.APIToken, error)
+	DeleteAPIToken(ctx context.Context, tokenID uuid.UUID) error
+	UpdateAPITokenUsage(ctx context.Context, tokenID uuid.UUID) error
+	
+	// 角色权限管理
+	AssignRole(ctx context.Context, userID, roleID uuid.UUID, grantedBy uuid.UUID, expiresAt *time.Time) error
+	RevokeRole(ctx context.Context, userID, roleID uuid.UUID) error
+	HasPermission(ctx context.Context, userID uuid.UUID, resource, action string) (bool, error)
+	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*models.Role, error)
+	
+	// 会话管理
+	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]*models.UserSession, error)
+	DeleteUserSession(ctx context.Context, sessionID uuid.UUID) error
+	
+	// 管理员功能
+	ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error)
+	UpdateUserStatus(ctx context.Context, userID uuid.UUID, req *models.UpdateUserStatusRequest) error
+	GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error)
 }
 
 // userService 用户服务实现
@@ -884,4 +912,323 @@ func generateRandomSuffix() string {
 		return fmt.Sprintf("_%d", time.Now().Unix()%10000)
 	}
 	return fmt.Sprintf("_%04d", n.Int64())
+}
+
+// LogoutAll 登出所有会话
+func (s *userService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
+	return s.userRepo.DeleteAllRefreshTokens(ctx, userID)
+}
+
+// GetUserByID 根据ID获取用户
+func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	return s.userRepo.GetUserByID(ctx, userID)
+}
+
+// GetUserByEmail 根据邮箱获取用户
+func (s *userService) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	return s.userRepo.GetUserByEmail(ctx, email)
+}
+
+// IsTokenBlacklisted 检查令牌是否在黑名单中
+func (s *userService) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	return s.userRepo.IsTokenBlacklisted(ctx, token)
+}
+
+// BlacklistToken 将令牌加入黑名单
+func (s *userService) BlacklistToken(ctx context.Context, token string, userID uuid.UUID, expiresAt time.Time) error {
+	return s.userRepo.BlacklistToken(ctx, token, userID, expiresAt)
+}
+
+// CreateAPIToken 创建API令牌
+func (s *userService) CreateAPIToken(ctx context.Context, userID uuid.UUID, req *models.CreateAPITokenRequest) (*models.APITokenResponse, error) {
+	// TODO: 实现API令牌创建逻辑
+	return nil, errors.New("not implemented yet")
+}
+
+// ValidateAPIToken 验证API令牌
+func (s *userService) ValidateAPIToken(ctx context.Context, token string) (*models.APIToken, error) {
+	// TODO: 实现API令牌验证逻辑
+	return nil, errors.New("not implemented yet")
+}
+
+// ListAPITokens 列出用户的API令牌
+func (s *userService) ListAPITokens(ctx context.Context, userID uuid.UUID) ([]*models.APIToken, error) {
+	// TODO: 实现API令牌列表逻辑
+	return nil, errors.New("not implemented yet")
+}
+
+// UpdateAPIToken 更新API令牌
+func (s *userService) UpdateAPIToken(ctx context.Context, tokenID uuid.UUID, req *models.UpdateAPITokenRequest) (*models.APIToken, error) {
+	// TODO: 实现API令牌更新逻辑
+	return nil, errors.New("not implemented yet")
+}
+
+// DeleteAPIToken 删除API令牌
+func (s *userService) DeleteAPIToken(ctx context.Context, tokenID uuid.UUID) error {
+	// TODO: 实现API令牌删除逻辑
+	return errors.New("not implemented yet")
+}
+
+// UpdateAPITokenUsage 更新API令牌使用情况
+func (s *userService) UpdateAPITokenUsage(ctx context.Context, tokenID uuid.UUID) error {
+	// TODO: 实现API令牌使用情况更新逻辑
+	return errors.New("not implemented yet")
+}
+
+// AssignRole 分配角色给用户
+func (s *userService) AssignRole(ctx context.Context, userID, roleID uuid.UUID, grantedBy uuid.UUID, expiresAt *time.Time) error {
+	// 检查用户是否存在
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user", zap.Error(err))
+		return err
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+	
+	// 检查角色是否存在
+	role, err := s.userRepo.GetRoleByID(ctx, roleID)
+	if err != nil {
+		s.logger.Error("Failed to get role", zap.Error(err))
+		return err
+	}
+	if role == nil {
+		return errors.New("role not found")
+	}
+	
+	// 创建角色分配
+	assignment := &models.UserRoleAssignment{
+		UserID:    userID,
+		RoleID:    roleID,
+		GrantedBy: &grantedBy,
+		ExpiresAt: expiresAt,
+		IsActive:  true,
+	}
+	
+	err = s.userRepo.AssignRoleToUser(ctx, assignment)
+	if err != nil {
+		s.logger.Error("Failed to assign role to user", zap.Error(err))
+		return err
+	}
+	
+	s.logger.Info("Role assigned to user successfully", 
+		zap.String("user_id", userID.String()),
+		zap.String("role_id", roleID.String()),
+		zap.String("granted_by", grantedBy.String()),
+	)
+	return nil
+}
+
+// RevokeRole 撤销用户的角色
+func (s *userService) RevokeRole(ctx context.Context, userID, roleID uuid.UUID) error {
+	err := s.userRepo.RevokeRoleFromUser(ctx, userID, roleID)
+	if err != nil {
+		s.logger.Error("Failed to revoke role from user", zap.Error(err))
+		return err
+	}
+	
+	s.logger.Info("Role revoked from user successfully", 
+		zap.String("user_id", userID.String()),
+		zap.String("role_id", roleID.String()),
+	)
+	return nil
+}
+
+// HasPermission 检查用户是否有特定权限
+func (s *userService) HasPermission(ctx context.Context, userID uuid.UUID, resource, action string) (bool, error) {
+	// 获取用户信息（包含角色）
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user", zap.Error(err))
+		return false, err
+	}
+	if user == nil {
+		return false, ErrUserNotFound
+	}
+	
+	// 超级管理员拥有所有权限
+	if user.GetHighestRole() == models.UserRoleSuperAdmin {
+		return true, nil
+	}
+	
+	// 获取用户的权限
+	permissions, err := s.userRepo.GetUserPermissions(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user permissions", zap.Error(err))
+		return false, err
+	}
+	
+	// 检查是否拥有特定权限
+	permissionName := resource + "." + action
+	for _, permission := range permissions {
+		if permission.Name == permissionName {
+			return true, nil
+		}
+	}
+	
+	return false, nil
+}
+
+// GetUserRoles 获取用户的角色
+func (s *userService) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*models.Role, error) {
+	// 检查用户是否存在
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user", zap.Error(err))
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+	
+	// 获取用户的角色（包括默认角色和分配的角色）
+	assignedRoles, err := s.userRepo.GetUserRoles(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user roles", zap.Error(err))
+		return nil, err
+	}
+	
+	// 添加默认角色
+	defaultRole, err := s.userRepo.GetRoleByName(ctx, user.DefaultRole)
+	if err != nil {
+		s.logger.Error("Failed to get default role", zap.Error(err))
+		return assignedRoles, nil // 返回已分配的角色
+	}
+	
+	if defaultRole != nil {
+		// 检查是否已在分配角色中
+		found := false
+		for _, role := range assignedRoles {
+			if role.ID == defaultRole.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			assignedRoles = append([]*models.Role{defaultRole}, assignedRoles...)
+		}
+	}
+	
+	return assignedRoles, nil
+}
+
+// GetUserSessions 获取用户的会话
+func (s *userService) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]*models.UserSession, error) {
+	// TODO: 实现获取用户会话逻辑
+	return nil, errors.New("not implemented yet")
+}
+
+// DeleteUserSession 删除用户会话
+func (s *userService) DeleteUserSession(ctx context.Context, sessionID uuid.UUID) error {
+	// TODO: 实现删除用户会话逻辑
+	return errors.New("not implemented yet")
+}
+
+// ListUsers 列出用户
+func (s *userService) ListUsers(ctx context.Context, query *models.UserListQuery) (*models.PaginatedResponse, error) {
+	// TODO: 实现完整的用户列表查询
+	// 这里提供一个简化的示例
+	users := []*models.AdminUserInfo{
+		{
+			ID:            uuid.New(),
+			Email:         "admin@example.com",
+			Username:      "admin",
+			EmailVerified: true,
+			Status:        models.UserStatusActive,
+			DefaultRole:   models.UserRoleAdmin,
+			LoginCount:    100,
+			CreatedAt:     time.Now().Add(-30 * 24 * time.Hour),
+			UpdatedAt:     time.Now(),
+		},
+		{
+			ID:            uuid.New(),
+			Email:         "user@example.com", 
+			Username:      "user1",
+			EmailVerified: true,
+			Status:        models.UserStatusActive,
+			DefaultRole:   models.UserRoleRegular,
+			LoginCount:    20,
+			CreatedAt:     time.Now().Add(-7 * 24 * time.Hour),
+			UpdatedAt:     time.Now(),
+		},
+	}
+
+	totalPages := (int64(len(users)) + int64(query.PerPage) - 1) / int64(query.PerPage)
+	
+	return &models.PaginatedResponse{
+		Data: users,
+		Pagination: &models.Pagination{
+			Page:       query.Page,
+			PageSize:   query.PerPage,
+			Total:      int64(len(users)),
+			TotalPages: int(totalPages),
+		},
+	}, nil
+}
+
+// UpdateUserStatus 更新用户状态
+func (s *userService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, req *models.UpdateUserStatusRequest) error {
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error("Failed to get user", zap.Error(err))
+		return err
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+
+	user.Status = req.Status
+	err = s.userRepo.UpdateUser(ctx, user)
+	if err != nil {
+		s.logger.Error("Failed to update user status", zap.Error(err))
+		return err
+	}
+
+	s.logger.Info("User status updated", 
+		zap.String("user_id", userID.String()),
+		zap.String("new_status", string(req.Status)),
+	)
+	return nil
+}
+
+// GetUserLoginLogs 获取用户登录日志
+func (s *userService) GetUserLoginLogs(ctx context.Context, query *models.LoginLogQuery) (*models.PaginatedResponse, error) {
+	// TODO: 实现完整的登录日志查询
+	// 这里提供一个简化的示例
+	logs := []models.UserLoginLog{
+		{
+			ID:        uuid.New(),
+			UserID:    uuid.New(),
+			LoginType: models.LoginTypePassword,
+			IPAddress: stringPtr("192.168.1.1"),
+			Success:   true,
+			CreatedAt: time.Now().Add(-1 * time.Hour),
+		},
+		{
+			ID:        uuid.New(),
+			UserID:    uuid.New(),
+			LoginType: models.LoginTypeGoogle,
+			IPAddress: stringPtr("192.168.1.2"),
+			Success:   true,
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		},
+	}
+
+	totalPages := (int64(len(logs)) + int64(query.PerPage) - 1) / int64(query.PerPage)
+
+	return &models.PaginatedResponse{
+		Data: logs,
+		Pagination: &models.Pagination{
+			Page:       query.Page,
+			PageSize:   query.PerPage,
+			Total:      int64(len(logs)),
+			TotalPages: int(totalPages),
+		},
+	}, nil
+}
+
+// stringPtr 辅助函数，返回字符串指针
+func stringPtr(s string) *string {
+	return &s
 }

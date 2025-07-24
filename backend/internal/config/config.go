@@ -10,14 +10,15 @@ import (
 
 // Config 应用配置结构
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
-	OAuth    OAuthConfig    `mapstructure:"oauth"`
-	OpenAI   OpenAIConfig   `mapstructure:"openai"`
-	Storage  StorageConfig  `mapstructure:"storage"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Redis     RedisConfig     `mapstructure:"redis"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	OAuth     OAuthConfig     `mapstructure:"oauth"`
+	OpenAI    OpenAIConfig    `mapstructure:"openai"`
+	Storage   StorageConfig   `mapstructure:"storage"`
+	Logging   LoggingConfig   `mapstructure:"logging"`
+	SuperAdmin SuperAdminConfig `mapstructure:"super_admin"`
 }
 
 type ServerConfig struct {
@@ -90,6 +91,12 @@ type LoggingConfig struct {
 	Format   string `mapstructure:"format"`
 	Output   string `mapstructure:"output"`
 	FilePath string `mapstructure:"file_path"`
+}
+
+type SuperAdminConfig struct {
+	Email    string `mapstructure:"email"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
 // LoadConfig 加载配置
@@ -179,6 +186,11 @@ func setDefaults() {
 	viper.SetDefault("logging.format", "json")
 	viper.SetDefault("logging.output", "stdout")
 	viper.SetDefault("logging.file_path", "logs/app.log")
+	
+	// 超级管理员默认配置
+	viper.SetDefault("super_admin.email", "admin@oraura.app")
+	viper.SetDefault("super_admin.username", "superadmin")
+	viper.SetDefault("super_admin.password", "SuperAdmin123!")
 }
 
 // GetServerAddress 获取服务器地址

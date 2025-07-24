@@ -9,6 +9,7 @@ import (
 	"github.com/OrAura/backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -631,4 +632,221 @@ func getValidationErrorMessage(err validator.FieldError) string {
 	default:
 		return err.Error()
 	}
+}
+
+// 辅助方法
+
+// getCurrentUser 从上下文中获取当前用户
+func (h *UserHandler) getCurrentUser(c *gin.Context) *models.User {
+	value, exists := c.Get("user")
+	if !exists {
+		response := models.NewErrorResponse(401, "Authentication required", nil)
+		c.JSON(http.StatusUnauthorized, response)
+		return nil
+	}
+
+	user, ok := value.(*models.User)
+	if !ok {
+		response := models.NewErrorResponse(401, "Invalid user context", nil)
+		c.JSON(http.StatusUnauthorized, response)
+		return nil
+	}
+
+	return user
+}
+
+// 增强认证功能方法
+
+// LogoutAll 登出所有会话
+// @Summary 登出所有会话
+// @Description 登出用户的所有会话
+// @Tags 认证
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} models.APIResponse
+// @Failure 401 {object} models.APIResponse
+// @Router /auth/logout/all [post]
+func (h *UserHandler) LogoutAll(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	err := h.userService.LogoutAll(c.Request.Context(), user.ID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("User logged out from all sessions", zap.String("user_id", user.ID.String()))
+	response := models.NewSuccessResponse(nil, "Logged out from all sessions successfully")
+	c.JSON(http.StatusOK, response)
+}
+
+// GetUserSessions 获取用户会话
+// @Summary 获取用户会话
+// @Description 获取当前用户的所有活跃会话
+// @Tags 用户
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} models.APIResponse{data=[]models.UserSession}
+// @Failure 401 {object} models.APIResponse
+// @Router /user/sessions [get]
+func (h *UserHandler) GetUserSessions(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	sessions, err := h.userService.GetUserSessions(c.Request.Context(), user.ID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	response := models.NewSuccessResponse(sessions, "Sessions retrieved successfully")
+	c.JSON(http.StatusOK, response)
+}
+
+// DeleteUserSession 删除用户会话
+// @Summary 删除用户会话
+// @Description 删除指定的用户会话
+// @Tags 用户
+// @Security BearerAuth
+// @Param session_id path string true "会话ID"
+// @Produce json
+// @Success 200 {object} models.APIResponse
+// @Failure 401 {object} models.APIResponse
+// @Failure 404 {object} models.APIResponse
+// @Router /user/sessions/{session_id} [delete]
+func (h *UserHandler) DeleteUserSession(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	sessionIDStr := c.Param("session_id")
+	sessionID, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		response := models.NewErrorResponse(400, "Invalid session ID format", nil)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	err = h.userService.DeleteUserSession(c.Request.Context(), sessionID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("User session deleted", 
+		zap.String("user_id", user.ID.String()),
+		zap.String("session_id", sessionID.String()))
+	response := models.NewSuccessResponse(nil, "Session deleted successfully")
+	c.JSON(http.StatusOK, response)
+}
+
+// ListAPITokens 列出API令牌
+// @Summary 列出API令牌
+// @Description 获取当前用户的所有API令牌
+// @Tags API令牌
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} models.APIResponse{data=[]models.APIToken}
+// @Failure 401 {object} models.APIResponse
+// @Router /user/api-tokens [get]
+func (h *UserHandler) ListAPITokens(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	tokens, err := h.userService.ListAPITokens(c.Request.Context(), user.ID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	response := models.NewSuccessResponse(tokens, "API tokens retrieved successfully")
+	c.JSON(http.StatusOK, response)
+}
+
+// CreateAPIToken 创建API令牌
+// @Summary 创建API令牌
+// @Description 为当前用户创建新的API令牌
+// @Tags API令牌
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param request body models.CreateAPITokenRequest true "API令牌创建请求"
+// @Success 201 {object} models.APIResponse{data=models.APITokenResponse}
+// @Failure 400 {object} models.APIResponse
+// @Failure 401 {object} models.APIResponse
+// @Router /user/api-tokens [post]
+func (h *UserHandler) CreateAPIToken(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	var req models.CreateAPITokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	if err := h.validator.Struct(&req); err != nil {
+		h.respondWithValidationError(c, err)
+		return
+	}
+
+	tokenResponse, err := h.userService.CreateAPIToken(c.Request.Context(), user.ID, &req)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("API token created", 
+		zap.String("user_id", user.ID.String()),
+		zap.String("token_name", req.Name))
+	response := models.NewSuccessResponse(tokenResponse, "API token created successfully")
+	c.JSON(http.StatusCreated, response)
+}
+
+// DeleteAPIToken 删除API令牌
+// @Summary 删除API令牌
+// @Description 删除指定的API令牌
+// @Tags API令牌
+// @Security BearerAuth
+// @Param token_id path string true "令牌ID"
+// @Produce json
+// @Success 200 {object} models.APIResponse
+// @Failure 401 {object} models.APIResponse
+// @Failure 404 {object} models.APIResponse
+// @Router /user/api-tokens/{token_id} [delete]
+func (h *UserHandler) DeleteAPIToken(c *gin.Context) {
+	user := h.getCurrentUser(c)
+	if user == nil {
+		return
+	}
+
+	tokenIDStr := c.Param("token_id")
+	tokenID, err := uuid.Parse(tokenIDStr)
+	if err != nil {
+		response := models.NewErrorResponse(400, "Invalid token ID format", nil)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	err = h.userService.DeleteAPIToken(c.Request.Context(), tokenID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	h.logger.Info("API token deleted", 
+		zap.String("user_id", user.ID.String()),
+		zap.String("token_id", tokenID.String()))
+	response := models.NewSuccessResponse(nil, "API token deleted successfully")
+	c.JSON(http.StatusOK, response)
 }
